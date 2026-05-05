@@ -24,7 +24,7 @@ namespace SIG_Defesa_Civil.API.Migrations
 
             modelBuilder.HasSequence<int>("seq_protocolo_ano");
 
-            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Arquivo", b =>
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.AvaliacaoRisco", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -32,41 +32,517 @@ namespace SIG_Defesa_Civil.API.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("EnviadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("EnviadoPor")
+                    b.Property<int?>("AbertaPorUsuarioId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("NomeOriginal")
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Emergencia")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("GrauRiscoInicial")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int>("OcorrenciaId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("SharepointId")
+                    b.Property<DateTime>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RequisicaoSetorDocumento")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TipificacaoInicial")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("SharepointUrl")
+                    b.HasKey("Id");
+
+                    b.HasIndex("AbertaPorUsuarioId");
+
+                    b.HasIndex("Emergencia");
+
+                    b.HasIndex("GrauRiscoInicial");
+
+                    b.HasIndex("OcorrenciaId")
+                        .IsUnique();
+
+                    b.ToTable("avaliacoes_risco");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.EncaminhamentoFinal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Encaminhamentos")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EntregaRelatorio")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("TipoArquivo")
+                    b.Property<int>("OcorrenciaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RegistradoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RelatorioVistoriaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RetornoEncaminhamentos")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OcorrenciaId")
+                        .IsUnique();
+
+                    b.HasIndex("RegistradoPorId");
+
+                    b.HasIndex("RelatorioVistoriaId");
+
+                    b.ToTable("encaminhamentos_finais");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Notificado", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("DataNotificacao")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("UsuarioEnvioId")
+                    b.Property<int>("OcorrenciaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RegistradoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RgCpf")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OcorrenciaId");
+
+                    b.HasIndex("RegistradoPorId");
+
+                    b.ToTable("notificados");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Observacao", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OcorrenciaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("UsuarioId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OcorrenciaId");
 
-                    b.HasIndex("UsuarioEnvioId");
+                    b.HasIndex("UsuarioId");
 
-                    b.ToTable("arquivos");
+                    b.ToTable("Observacoes");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AbertaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CriadoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DescricaoProblema")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("ExcluidoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Protocolo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SolicitanteId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AbertaEm");
+
+                    b.HasIndex("CriadoPorId");
+
+                    b.HasIndex("DeletedAt");
+
+                    b.HasIndex("ExcluidoPorId");
+
+                    b.HasIndex("Protocolo")
+                        .IsUnique();
+
+                    b.HasIndex("SolicitanteId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("ocorrencias");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.TentativaVistoria", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AgendamentoId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("DataHoraTentativa")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("NumeroTentativa")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Observacao")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgendamentoId", "NumeroTentativa")
+                        .IsUnique();
+
+                    b.ToTable("tentativas_vistoria");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Vistoria", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AreasAfetadas")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CaracterizacaoDoLocal")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly>("DataVistoria")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DescricaoDoLocal")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Edificacao")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EncaminhamentosDeCampo")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Estrutura")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("GrauRiscoEncontrado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<TimeSpan>("HorarioInicio")
+                        .HasColumnType("interval");
+
+                    b.Property<TimeSpan>("HorarioTermino")
+                        .HasColumnType("interval");
+
+                    b.Property<string>("Interdicao")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Motivacao")
+                        .HasColumnType("text");
+
+                    b.Property<int>("NumeroAdultos")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NumeroComodos")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NumeroCriancas")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NumeroDeficientes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NumeroIdosos")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NumeroMoradias")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NumeroMoradiasNoLote")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NumeroPavimentos")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OcorrenciaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Orientacoes")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("PossuiUnidadeFamiliar")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("RegimeOcupacao")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RegistradoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Remocao")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TipificacaoOcorrencia")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TipoRisco")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("TotalMoradores")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataVistoria");
+
+                    b.HasIndex("GrauRiscoEncontrado");
+
+                    b.HasIndex("OcorrenciaId")
+                        .IsUnique();
+
+                    b.HasIndex("RegistradoPorId");
+
+                    b.ToTable("vistorias");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AgendadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("AgendadoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OcorrenciaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Vistoriador1Id")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Vistoriador2Id")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgendadoPorId");
+
+                    b.HasIndex("OcorrenciaId")
+                        .IsUnique();
+
+                    b.HasIndex("Vistoriador1Id");
+
+                    b.HasIndex("Vistoriador2Id");
+
+                    b.ToTable("agendamentos_vistoria");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Arquivo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CaminhoRelativo")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("caminho_relativo");
+
+                    b.Property<DateTime>("EnviadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enviado_em");
+
+                    b.Property<int>("EnviadoPorUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("enviado_por");
+
+                    b.Property<string>("NomeOriginal")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("nome_original");
+
+                    b.Property<int>("OcorrenciaId")
+                        .HasColumnType("integer")
+                        .HasColumnName("ocorrencia_id");
+
+                    b.Property<long>("TamanhoBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tamanho_bytes");
+
+                    b.Property<string>("TipoArquivo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("tipo_arquivo");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CaminhoRelativo")
+                        .IsUnique()
+                        .HasDatabaseName("idx_arquivos_caminho");
+
+                    b.HasIndex("EnviadoPorUserId");
+
+                    b.HasIndex("OcorrenciaId");
+
+                    b.ToTable("arquivos", (string)null);
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Localizacao", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Bairro")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Cep")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Cidade")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Complemento")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Coordenada")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Endereco")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Numero")
+                        .HasColumnType("text");
+
+                    b.Property<string>("NumeroIptu")
+                        .HasColumnType("text");
+
+                    b.Property<int>("OcorrenciaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Referencia")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Uf")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Bairro");
+
+                    b.HasIndex("Cep");
+
+                    b.HasIndex("OcorrenciaId")
+                        .IsUnique();
+
+                    b.ToTable("localizacoes");
                 });
 
             modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.LogAcessoLgpd", b =>
@@ -105,76 +581,11 @@ namespace SIG_Defesa_Civil.API.Migrations
 
                     b.HasIndex("OcorrenciaId");
 
+                    b.HasIndex("RegistradoEm");
+
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("log_acesso_lgpd");
-                });
-
-            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Ocorrencia", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("AbertaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("AtendenteId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("CidadaoId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("ConcluidaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EnderecoCompleto")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal?>("Latitude")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("Longitude")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("NivelGravidade")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Protocolo")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("TipoRisco")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("TriagemEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("VistoriaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("VistoriadorId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AtendenteId");
-
-                    b.HasIndex("CidadaoId");
-
-                    b.HasIndex("Protocolo")
-                        .IsUnique();
-
-                    b.HasIndex("VistoriadorId");
-
-                    b.ToTable("ocorrencias");
                 });
 
             modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", b =>
@@ -188,6 +599,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<bool>("Ativo")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Celular")
+                        .HasColumnType("text");
+
                     b.Property<string>("Cpf")
                         .HasColumnType("text");
 
@@ -198,11 +612,20 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Matricula")
+                        .HasColumnType("text");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("OrgaoEmissor")
+                        .HasColumnType("text");
+
                     b.Property<string>("Rg")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SenhaHash")
                         .HasColumnType("text");
 
                     b.Property<string>("Telefone")
@@ -217,29 +640,211 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.HasIndex("Cpf")
                         .IsUnique();
 
-                    b.HasIndex("Email")
-                        .IsUnique();
+                    b.HasIndex("Email");
 
                     b.ToTable("usuarios");
                 });
 
-            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Arquivo", b =>
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.AvaliacaoRisco", b =>
                 {
-                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Ocorrencia", "Ocorrencia")
-                        .WithMany("Arquivos")
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "AbertaPorUsuario")
+                        .WithMany()
+                        .HasForeignKey("AbertaPorUsuarioId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
+                        .WithOne("AvaliacaoRisco")
+                        .HasForeignKey("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.AvaliacaoRisco", "OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AbertaPorUsuario");
+
+                    b.Navigation("Ocorrencia");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.EncaminhamentoFinal", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
+                        .WithOne("EncaminhamentoFinal")
+                        .HasForeignKey("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.EncaminhamentoFinal", "OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "RegistradoPor")
+                        .WithMany()
+                        .HasForeignKey("RegistradoPorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Arquivo", "RelatorioVistoria")
+                        .WithMany()
+                        .HasForeignKey("RelatorioVistoriaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Ocorrencia");
+
+                    b.Navigation("RegistradoPor");
+
+                    b.Navigation("RelatorioVistoria");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Notificado", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
+                        .WithMany("Notificados")
                         .HasForeignKey("OcorrenciaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "UsuarioEnvio")
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "RegistradoPor")
                         .WithMany()
-                        .HasForeignKey("UsuarioEnvioId")
+                        .HasForeignKey("RegistradoPorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Ocorrencia");
+
+                    b.Navigation("RegistradoPor");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Observacao", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
+                        .WithMany("Observacoes")
+                        .HasForeignKey("OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Ocorrencia");
 
-                    b.Navigation("UsuarioEnvio");
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "CriadoPor")
+                        .WithMany()
+                        .HasForeignKey("CriadoPorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "ExcluidoPor")
+                        .WithMany()
+                        .HasForeignKey("ExcluidoPorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Solicitante")
+                        .WithMany()
+                        .HasForeignKey("SolicitanteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CriadoPor");
+
+                    b.Navigation("ExcluidoPor");
+
+                    b.Navigation("Solicitante");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.TentativaVistoria", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", "Agendamento")
+                        .WithMany("Tentativas")
+                        .HasForeignKey("AgendamentoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Agendamento");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Vistoria", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
+                        .WithOne("Vistoria")
+                        .HasForeignKey("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Vistoria", "OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "RegistradoPor")
+                        .WithMany()
+                        .HasForeignKey("RegistradoPorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Ocorrencia");
+
+                    b.Navigation("RegistradoPor");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "AgendadoPor")
+                        .WithMany()
+                        .HasForeignKey("AgendadoPorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
+                        .WithOne("AgendamentoVistoria")
+                        .HasForeignKey("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", "OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Vistoriador1")
+                        .WithMany()
+                        .HasForeignKey("Vistoriador1Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Vistoriador2")
+                        .WithMany()
+                        .HasForeignKey("Vistoriador2Id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AgendadoPor");
+
+                    b.Navigation("Ocorrencia");
+
+                    b.Navigation("Vistoriador1");
+
+                    b.Navigation("Vistoriador2");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Arquivo", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("EnviadoPorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
+                        .WithMany("Arquivos")
+                        .HasForeignKey("OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ocorrencia");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Localizacao", b =>
+                {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
+                        .WithOne("Localizacao")
+                        .HasForeignKey("SIG_Defesa_Civil.API.Data.Models.Tabelas.Localizacao", "OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ocorrencia");
                 });
 
             modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.LogAcessoLgpd", b =>
@@ -248,7 +853,7 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .WithMany()
                         .HasForeignKey("ArquivoId");
 
-                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Ocorrencia", "Ocorrencia")
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
                         .WithMany()
                         .HasForeignKey("OcorrenciaId");
 
@@ -265,32 +870,28 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Navigation("Usuario");
                 });
 
-            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Ocorrencia", b =>
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", b =>
                 {
-                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Atendente")
-                        .WithMany()
-                        .HasForeignKey("AtendenteId");
+                    b.Navigation("AgendamentoVistoria");
 
-                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Cidadao")
-                        .WithMany()
-                        .HasForeignKey("CidadaoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Navigation("Arquivos");
 
-                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Vistoriador")
-                        .WithMany()
-                        .HasForeignKey("VistoriadorId");
+                    b.Navigation("AvaliacaoRisco");
 
-                    b.Navigation("Atendente");
+                    b.Navigation("EncaminhamentoFinal");
 
-                    b.Navigation("Cidadao");
+                    b.Navigation("Localizacao");
 
-                    b.Navigation("Vistoriador");
+                    b.Navigation("Notificados");
+
+                    b.Navigation("Observacoes");
+
+                    b.Navigation("Vistoria");
                 });
 
-            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.Ocorrencia", b =>
+            modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", b =>
                 {
-                    b.Navigation("Arquivos");
+                    b.Navigation("Tentativas");
                 });
 #pragma warning restore 612, 618
         }

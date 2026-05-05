@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using SIG_Defesa_Civil.API.Data.DTO.Requests;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Arquivos;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias;
@@ -6,35 +7,43 @@ using SIG_Defesa_Civil.API.Enums;
 using SIG_Defesa_Civil.API.Exceptions;
 using SIG_Defesa_Civil.API.Services;
 using SIG_Defesa_Civil.API.Services.Ocorrencia;
+using SIG_Defesa_Civil.API.Services.Storage;
 using System.Text.Json;
 
 namespace SIG_Defesa_Civil.API.Controllers
 {
     [ApiController]
-    [Route("api/v1/[controller]")]
+    [Route("api/v1/ocorrencias")]
     [Produces("application/json")]
-    public class OcorrenciaController : ControllerBase
+    public class OcorrenciaController : DefesaCivilBaseController
     {
         private readonly IOcorrenciaService _ocorrenciaService;
+        private readonly IStorageService _storageService;
         private readonly ILogger<OcorrenciaController> _logger;
 
         public OcorrenciaController(
             IOcorrenciaService ocorrenciaService,
+            IStorageService storageService,
             ILogger<OcorrenciaController> logger)
         {
             _ocorrenciaService = ocorrenciaService;
+            _storageService = storageService;
             _logger = logger;
         }
 
+        // ══════════════════════════════════════════════════════════════════════════
+        // POST /api/v1/ocorrencias — Etapa 1: Criar
+        // ══════════════════════════════════════════════════════════════════════════
+
         /// <summary>
-        /// Cria uma nova ocorrência de Defesa Civil
+        /// Cria uma nova ocorrência de Defesa Civil (Etapa 1).
         /// </summary>
         /// <param name="dados">JSON com dados estruturados (cidadão, local, descrição)</param>
         /// <param name="arquivos">Lista de arquivos (fotos, comprovantes) via multipart/form-data</param>
         /// <returns>Protocolo gerado e dados da ocorrência criada</returns>
         /// <response code="201">Ocorrência criada com sucesso</response>
         /// <response code="400">Dados inválidos ou ausentes</response>
-        /// <response code="503">Sistema temporariamente indisponível (falha no SharePoint)</response>
+        /// <response code="503">Sistema temporariamente indisponível (falha no armazenamento)</response>
         [HttpPost]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResponse<OcorrenciaCriadaDto>), StatusCodes.Status201Created)]
@@ -45,23 +54,20 @@ namespace SIG_Defesa_Civil.API.Controllers
             [FromForm] List<IFormFile>? arquivos)
         {
             var ipOrigem = ObterIpCliente();
+            // Endpoint público — cidadãos não têm conta no sistema.
+            // O ID do criador é resolvido internamente pelo serviço a partir do CPF informado.
 
             _logger.LogInformation(
                 "Recebida requisição de criação de ocorrência. IP: {IP}, Arquivos: {Count}",
-                ipOrigem,
-                arquivos?.Count ?? 0);
+                ipOrigem, arquivos?.Count ?? 0);
 
             try
             {
-                // 1. Validar presença de dados
                 if (string.IsNullOrWhiteSpace(dados))
-                {
                     return BadRequest(ApiResponse<object>.Error(
                         "O campo 'dados' é obrigatório",
                         ErrosRequisicoes.DADOS_AUSENTES));
-                }
 
-                // 2. Deserializar JSON dos dados estruturados
                 CriarOcorrenciaRequest? request;
                 try
                 {
@@ -78,110 +84,345 @@ namespace SIG_Defesa_Civil.API.Controllers
                 }
 
                 if (request == null)
-                {
                     return BadRequest(ApiResponse<object>.Error(
                         "Dados da ocorrência inválidos",
                         ErrosRequisicoes.DADOS_INVALIDOS));
-                }
 
-                // 3. Validar campos obrigatórios
                 var errosValidacao = ValidarRequest(request);
                 if (errosValidacao.Count > 0)
-                {
                     return BadRequest(ApiResponse<object>.Error(
                         $"Erros de validação: {string.Join(", ", errosValidacao)}",
                         ErrosRequisicoes.VALIDACAO_FALHOU));
-                }
 
-                // 4. Processar arquivos
                 if (arquivos == null || arquivos.Count == 0)
-                {
                     return BadRequest(ApiResponse<object>.Error(
                         "É obrigatório enviar ao menos uma foto ou documento",
                         ErrosRequisicoes.ARQUIVOS_AUSENTES));
-                }
 
-                // Mapear IFormFile para ArquivoUploadDto
                 request.Arquivos = arquivos.Select((arquivo, index) =>
-                {
-                    // Identificar tipo do arquivo pela ordem ou nome
-                    // Para MVP, podemos assumir ordem fixa ou usar convenção de nomes
-                    var tipoArquivo = DeterminarTipoArquivo(arquivo.FileName, index);
-
-                    return new ArquivoUploadDto
+                    new ArquivoUploadDto
                     {
-                        TipoArquivo = tipoArquivo,
+                        TipoArquivo = DeterminarTipoArquivo(arquivo.FileName, index),
                         File = arquivo
-                    };
-                }).ToList();
+                    }).ToList();
 
-                // Validar tamanho dos arquivos (limite de 10MB por arquivo)
-                const long maxFileSize = 10 * 1024 * 1024; // 10MB
+                const long maxFileSize = 10 * 1024 * 1024; // 10 MB
                 var arquivoGrande = request.Arquivos.FirstOrDefault(a => a.File.Length > maxFileSize);
                 if (arquivoGrande != null)
-                {
                     return BadRequest(ApiResponse<object>.Error(
                         $"Arquivo '{arquivoGrande.File.FileName}' excede o tamanho máximo de 10MB",
                         ErrosRequisicoes.ARQUIVO_MUITO_GRANDE));
-                }
 
-                // 5. Chamar serviço para criar ocorrência (com transação)
                 var resultado = await _ocorrenciaService.CriarOcorrenciaAsync(request);
 
-                _logger.LogInformation(
-                    "Ocorrência criada com sucesso. Protocolo: {Protocolo}",
-                    resultado.Protocolo);
+                _logger.LogInformation("Ocorrência criada. Protocolo: {Protocolo}", resultado.Protocolo);
 
-                // 6. Retornar HTTP 201 Created
                 return StatusCode(
                     StatusCodes.Status201Created,
-                    ApiResponse<OcorrenciaCriadaDto>.Success(
-                        resultado,
-                        "Ocorrência registrada com sucesso"));
+                    ApiResponse<OcorrenciaCriadaDto>.Success(resultado, "Ocorrência registrada com sucesso"));
             }
-            catch (SharePointUploadException ex)
+            catch (StorageException ex)
             {
-                // Falha no SharePoint = HTTP 503 (Service Unavailable)
-                _logger.LogError(ex,
-                    "Falha no upload SharePoint. IP: {IP}",
-                    ipOrigem);
-
+                _logger.LogError(ex, "Falha ao salvar arquivos no disco. IP: {IP}, Tipo: {Tipo}", ipOrigem, ex.TipoErro);
                 return StatusCode(
                     StatusCodes.Status503ServiceUnavailable,
                     ApiResponse<object>.Error(
-                        "Sistema temporariamente indisponível. Não foi possível processar sua solicitação. Tente novamente em alguns minutos.",
+                        "Sistema temporariamente indisponível. Tente novamente em alguns minutos.",
                         ErrosRequisicoes.UPLOAD_FAILED));
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogError(ex, "Erro de operação ao criar ocorrência. IP: {IP}", ipOrigem);
-
-                return StatusCode(
-                    StatusCodes.Status500InternalServerError,
-                    ApiResponse<object>.Error(
-                        "Erro ao processar a ocorrência. Tente novamente.",
-                        ErrosRequisicoes.ERRO_PROCESSAMENTO));
+                return ErroNegocio(ex.Message);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro inesperado ao criar ocorrência. IP: {IP}", ipOrigem);
-
-                return StatusCode(
-                    StatusCodes.Status500InternalServerError,
-                    ApiResponse<object>.Error(
-                        "Erro interno do servidor. Tente novamente mais tarde.",
-                        ErrosRequisicoes.ERRO_INTERNO));
+                return ErroInterno(ex, _logger, "CriarOcorrencia");
             }
         }
 
+        // ══════════════════════════════════════════════════════════════════════════
+        // GET /api/v1/ocorrencias — Listar (dados mascarados LGPD)
+        // ══════════════════════════════════════════════════════════════════════════
+
         /// <summary>
-        /// Valida os campos obrigatórios do request
+        /// Lista ocorrências com dados pessoais mascarados (LGPD).
+        /// Suporta filtros por status, grau de risco, emergência, bairro e período.
         /// </summary>
-        private List<string> ValidarRequest(CriarOcorrenciaRequest request)
+        /// <response code="200">Lista de ocorrências mascaradas</response>
+        [HttpGet]
+        [ProducesResponseType(typeof(ApiResponse<List<OcorrenciaListagemDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ListarOcorrencias(
+            [FromQuery] StatusOcorrencia? status,
+            [FromQuery] GrauRisco? grauRisco,
+            [FromQuery] bool? emergencia,
+            [FromQuery] string? bairro,
+            [FromQuery] string? protocolo,
+            [FromQuery] int? vistoriadorId,
+            [FromQuery] DateTime? dataInicio,
+            [FromQuery] DateTime? dataFim,
+            [FromQuery] int pagina = 1,
+            [FromQuery] int tamanhoPagina = 50)
+        {
+            try
+            {
+                var filtros = new FiltroOcorrenciaDto
+                {
+                    Status = status,
+                    GrauRiscoInicial = grauRisco,
+                    Emergencia = emergencia,
+                    Bairro = bairro,
+                    Protocolo = protocolo,
+                    VistoriadorId = vistoriadorId,
+                    DataInicio = dataInicio,
+                    DataFim = dataFim
+                };
+
+                var paginacao = new PaginacaoDto
+                {
+                    PaginaAtual = pagina,
+                    ItensPorPagina = Math.Min(tamanhoPagina, 100)
+                };
+
+                var resultado = await _ocorrenciaService.ListarOcorrenciasMascaradasAsync(filtros, paginacao);
+
+                return Ok(ApiResponse<List<OcorrenciaListagemDto>>.Success(
+                    resultado, $"{resultado.Count} ocorrência(s) encontrada(s)"));
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, "ListarOcorrencias");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // GET /api/v1/ocorrencias/{id} — Detalhe completo (mascarado)
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Retorna o detalhe completo de uma ocorrência com todas as etapas preenchidas.
+        /// Dados do solicitante são mascarados por padrão (LGPD).
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <response code="200">Detalhe completo da ocorrência</response>
+        /// <response code="404">Ocorrência não encontrada</response>
+        [HttpGet("{id:int}")]
+        [ProducesResponseType(typeof(ApiResponse<OcorrenciaDetalheDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ObterDetalhe([FromRoute] int id)
+        {
+            try
+            {
+                var resultado = await _ocorrenciaService.ObterDetalhesAsync(id);
+                return Ok(ApiResponse<OcorrenciaDetalheDto>.Success(resultado));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"ObterDetalhe({id})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // PUT /api/v1/ocorrencias/{id} — Atualizar dados da Etapa 1
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Atualiza dados da Etapa 1 (cidadão, local, descrição).
+        /// Apenas os campos enviados são alterados (semântica PATCH).
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="request">Campos a atualizar</param>
+        /// <response code="200">Dados atualizados</response>
+        /// <response code="404">Ocorrência não encontrada</response>
+        [HttpPut("{id:int}")]
+        [ProducesResponseType(typeof(ApiResponse<OcorrenciaCriadaDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AtualizarOcorrencia(
+            [FromRoute] int id,
+            [FromBody] AtualizarOcorrenciaRequest request)
+        {
+            try
+            {
+                var resultado = await _ocorrenciaService.AtualizarOcorrenciaAsync(id, request, ObterUsuarioIdInterno());
+                return Ok(ApiResponse<OcorrenciaCriadaDto>.Success(resultado, "Ocorrência atualizada com sucesso"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"AtualizarOcorrencia({id})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // DELETE /api/v1/ocorrencias/{id} — Soft-delete
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Exclui logicamente uma ocorrência (soft-delete).
+        /// O registro continua no banco para auditoria; status é alterado para CANCELADA.
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="motivo">Motivo opcional da exclusão</param>
+        /// <response code="204">Excluída com sucesso</response>
+        /// <response code="404">Ocorrência não encontrada</response>
+        [HttpDelete("{id:int}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ExcluirOcorrencia(
+            [FromRoute] int id,
+            [FromQuery] string? motivo)
+        {
+            try
+            {
+                await _ocorrenciaService.ExcluirAsync(id, ObterUsuarioIdInterno(), motivo);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"ExcluirOcorrencia({id})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // POST /api/v1/ocorrencias/{id}/restaurar — Restaurar exclusão
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Restaura uma ocorrência previamente excluída (limpa o soft-delete).
+        /// Status retorna para CANCELADA — ajuste manual necessário.
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <response code="200">Ocorrência restaurada</response>
+        /// <response code="404">Ocorrência não encontrada ou não está excluída</response>
+        [HttpPost("{id:int}/restaurar")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> RestaurarOcorrencia([FromRoute] int id)
+        {
+            try
+            {
+                await _ocorrenciaService.RestaurarAsync(id, ObterUsuarioIdInterno());
+                return Ok(ApiResponse<object>.Success((object?)null, "Ocorrência restaurada com sucesso"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"RestaurarOcorrencia({id})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // POST /api/v1/ocorrencias/{id}/revelar-dados — LGPD
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Revela os dados pessoais não mascarados de uma ocorrência.
+        /// LGPD: exige justificativa ≥ 10 caracteres e registra auditoria obrigatória.
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="request">Usuário solicitante e justificativa</param>
+        /// <response code="200">Dados revelados com registro de auditoria</response>
+        /// <response code="403">Usuário sem permissão (CIDADAO não pode revelar)</response>
+        /// <response code="404">Ocorrência não encontrada</response>
+        [HttpPost("{id:int}/revelar-dados")]
+        [ProducesResponseType(typeof(ApiResponse<OcorrenciaDadosSensiveisDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> RevelarDados(
+            [FromRoute] int id,
+            [FromBody] RevelarDadosRequest request)
+        {
+            try
+            {
+                var resultado = await _ocorrenciaService.RevelarDadosSensiveisAsync(id, request, ObterIpCliente());
+                return Ok(ApiResponse<OcorrenciaDadosSensiveisDto>.Success(resultado));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    ApiResponse<object>.Error(ex.Message, ErrosRequisicoes.ACESSO_NEGADO));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"RevelarDados({id})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // GET /api/v1/ocorrencias/{id}/arquivos/download — Download de arquivo
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Faz o download de um arquivo vinculado a uma ocorrência.
+        /// O caminho relativo é validado contra a lista de arquivos da ocorrência (segurança).
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="caminho">Caminho relativo do arquivo (ex: /2026-0001/Documentos/FOTO_CIDADAO_uuid.jpg)</param>
+        /// <response code="200">Stream do arquivo</response>
+        /// <response code="404">Ocorrência ou arquivo não encontrado</response>
+        [HttpGet("{id:int}/arquivos/download")]
+        [Produces("application/octet-stream", "image/jpeg", "image/png", "application/pdf")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DownloadArquivo(
+            [FromRoute] int id,
+            [FromQuery] string caminho)
+        {
+            try
+            {
+                var ocorrencia = await _ocorrenciaService.ObterDetalhesAsync(id);
+
+                var arquivoExiste = ocorrencia.Arquivos
+                    .Any(a => string.Equals(a.CaminhoRelativo, caminho, StringComparison.OrdinalIgnoreCase));
+
+                if (!arquivoExiste)
+                    return NaoEncontrado("Arquivo não encontrado para esta ocorrência.");
+
+                var stream = await _storageService.LerArquivoAsync(caminho);
+                var contentType = ObterContentType(caminho);
+                var nomeArquivo = Path.GetFileName(caminho);
+
+                return File(stream, contentType, nomeArquivo);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (FileNotFoundException)
+            {
+                return NaoEncontrado("Arquivo não encontrado no armazenamento.");
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"DownloadArquivo({id}, {caminho})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // HELPERS PRIVADOS
+        // ══════════════════════════════════════════════════════════════════════════
+
+        private static List<string> ValidarRequest(CriarOcorrenciaRequest request)
         {
             var erros = new List<string>();
 
-            // Validar cidadão
             if (string.IsNullOrWhiteSpace(request.Cidadao?.Nome))
                 erros.Add("Nome do cidadão é obrigatório");
 
@@ -193,57 +434,46 @@ namespace SIG_Defesa_Civil.API.Controllers
             if (string.IsNullOrWhiteSpace(request.Cidadao?.Email))
                 erros.Add("Email do cidadão é obrigatório");
 
-            if (string.IsNullOrWhiteSpace(request.Cidadao?.Telefone))
-                erros.Add("Telefone do cidadão é obrigatório");
+            if (string.IsNullOrWhiteSpace(request.Local?.Endereco))
+                erros.Add("Endereço é obrigatório");
 
-            // Validar local
-            if (string.IsNullOrWhiteSpace(request.Local?.EnderecoCompleto))
-                erros.Add("Endereço completo é obrigatório");
+            if (string.IsNullOrWhiteSpace(request.Local?.Bairro))
+                erros.Add("Bairro é obrigatório");
 
-            // Validar descrição
+            if (string.IsNullOrWhiteSpace(request.Local?.Cidade))
+                erros.Add("Cidade é obrigatória");
+
+            if (string.IsNullOrWhiteSpace(request.Local?.Uf) || request.Local.Uf.Length != 2)
+                erros.Add("UF é obrigatória (2 caracteres)");
+
             if (string.IsNullOrWhiteSpace(request.DescricaoProblema))
                 erros.Add("Descrição do problema é obrigatória");
 
             return erros;
         }
 
-        /// <summary>
-        /// Determina o tipo do arquivo baseado no nome ou posição
-        /// </summary>
-        private TipoArquivo DeterminarTipoArquivo(string nomeArquivo, int indice)
+        private static TipoArquivo DeterminarTipoArquivo(string nomeArquivo, int indice)
         {
             var nomeLower = nomeArquivo.ToLowerInvariant();
-
-            // Tentar identificar por palavras-chave no nome
             if (nomeLower.Contains("comprovante") || nomeLower.Contains("residencia"))
                 return TipoArquivo.COMPROVANTE_RESIDENCIA;
-
-            // Por padrão, considerar como foto do cidadão
-            // Em produção, o front-end deveria enviar metadados explícitos
             return TipoArquivo.FOTO_CIDADAO;
         }
 
-        /// <summary>
-        /// Obtém o endereço IP do cliente (suporta proxy reverso)
-        /// </summary>
-        private string ObterIpCliente()
+        private static string ObterContentType(string caminho)
         {
-            // Verificar headers de proxy reverso (nginx, load balancer)
-            var forwardedFor = Request.Headers["X-Forwarded-For"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(forwardedFor))
+            var ext = Path.GetExtension(caminho).ToLowerInvariant();
+            return ext switch
             {
-                // X-Forwarded-For pode conter múltiplos IPs separados por vírgula
-                return forwardedFor.Split(',')[0].Trim();
-            }
-
-            var realIp = Request.Headers["X-Real-IP"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(realIp))
-            {
-                return realIp;
-            }
-
-            // Fallback para IP direto da conexão
-            return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Desconhecido";
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png"            => "image/png",
+                ".gif"            => "image/gif",
+                ".webp"           => "image/webp",
+                ".pdf"            => "application/pdf",
+                ".doc"            => "application/msword",
+                ".docx"           => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                _                 => "application/octet-stream",
+            };
         }
     }
 }

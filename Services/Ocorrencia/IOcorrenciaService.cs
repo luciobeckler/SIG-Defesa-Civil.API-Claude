@@ -7,48 +7,74 @@ using SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias;
 namespace SIG_Defesa_Civil.API.Services.Ocorrencia
 {
     /// <summary>
-    /// Serviço de lógica de negócio para gestão de ocorrências
+    /// Gerencia o ciclo de vida da ocorrência: CRUD da Etapa 1, paginação, LGPD e soft-delete.
+    /// Operações das Etapas 2–6 ficam nos serviços específicos de cada etapa.
     /// </summary>
     public interface IOcorrenciaService
     {
+        // ── Etapa 1: Abertura ─────────────────────────────────────────────────────
+
         /// <summary>
-        /// Cria uma nova ocorrência com transação coordenada entre PostgreSQL e SharePoint.
-        /// Regra "All-or-Nothing": Se o SharePoint falhar, faz rollback do banco.
+        /// Cria uma nova ocorrência (Etapa 1) a partir de uma solicitação pública de cidadão.
+        /// Transação "All-or-Nothing": banco + storage de arquivos.
+        /// <para>
+        /// O <c>CriadoPorId</c> é preenchido automaticamente com o ID do solicitante
+        /// obtido/criado a partir do CPF — cidadãos não possuem conta prévia no sistema.
+        /// </para>
         /// </summary>
         Task<OcorrenciaCriadaDto> CriarOcorrenciaAsync(CriarOcorrenciaRequest request);
 
         /// <summary>
-        /// Lista ocorrências com dados sensíveis mascarados (compliance LGPD).
-        /// Não grava log de acesso, pois os dados estão protegidos.
+        /// Retorna o detalhe completo de uma ocorrência (todas as etapas preenchidas).
+        /// Dados do solicitante são mascarados por padrão (LGPD).
         /// </summary>
-        /// <param name="filtros">Filtros opcionais (status, data, etc)</param>
-        /// <param name="paginacao">Parâmetros de paginação</param>
-        /// <returns>Lista de ocorrências com dados mascarados</returns>
+        Task<OcorrenciaDetalheDto> ObterDetalhesAsync(int ocorrenciaId);
+
+        /// <summary>
+        /// Atualiza dados da Etapa 1 (solicitante, local, descrição).
+        /// Apenas campos enviados são atualizados (PATCH semântico).
+        /// </summary>
+        Task<OcorrenciaCriadaDto> AtualizarOcorrenciaAsync(
+            int ocorrenciaId,
+            AtualizarOcorrenciaRequest request,
+            int usuarioId);
+
+        /// <summary>
+        /// Soft-delete: preenche DeletedAt e ExcluidoPorId.
+        /// O registro continua no banco para fins de auditoria.
+        /// </summary>
+        Task ExcluirAsync(int ocorrenciaId, int usuarioId, string? motivo = null);
+
+        /// <summary>
+        /// Restaura uma ocorrência previamente excluída (limpa DeletedAt).
+        /// </summary>
+        Task RestaurarAsync(int ocorrenciaId, int usuarioId);
+
+        // ── Listagem e LGPD ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Lista ocorrências com dados sensíveis mascarados (LGPD).
+        /// Registros com DeletedAt preenchido são excluídos da listagem padrão.
+        /// </summary>
         Task<List<OcorrenciaListagemDto>> ListarOcorrenciasMascaradasAsync(
             FiltroOcorrenciaDto? filtros = null,
             PaginacaoDto? paginacao = null);
 
         /// <summary>
-        /// Revela dados sensíveis de uma ocorrência específica.
-        /// CRÍTICO: Grava registro de acesso na tabela log_acesso_lgpd.
+        /// Revela dados sensíveis de uma ocorrência.
+        /// CRÍTICO: grava log obrigatório em log_acesso_lgpd dentro de transação.
         /// </summary>
-        /// <param name="ocorrenciaId">ID da ocorrência</param>
-        /// <param name="request">Dados do usuário que está acessando + justificativa</param>
-        /// <param name="ipOrigem">IP de origem da requisição</param>
-        /// <returns>Dados completos sem mascaramento</returns>
         Task<OcorrenciaDadosSensiveisDto> RevelarDadosSensiveisAsync(
             int ocorrenciaId,
             RevelarDadosRequest request,
             string ipOrigem);
 
+        // ── Documentos ────────────────────────────────────────────────────────────
+
         /// <summary>
-        /// Gera documentos Word em lote usando templates pré-definidos.
-        /// Para cada ocorrência, substitui tags no template e faz upload no SharePoint.
-        /// Continua o processamento mesmo se uma geração falhar.
+        /// Gera documentos Word em lote via templates pré-definidos.
+        /// Continua o processamento mesmo se uma geração individual falhar.
         /// </summary>
-        /// <param name="request">Lista de IDs e nome do template</param>
-        /// <returns>Resultado com sucessos e falhas detalhados</returns>
-        Task<GeracaoLoteResultadoDto> GerarDocumentosEmLoteAsync(
-            GerarDocumentosLoteRequest request);
+        Task<GeracaoLoteResultadoDto> GerarDocumentosEmLoteAsync(GerarDocumentosLoteRequest request);
     }
 }

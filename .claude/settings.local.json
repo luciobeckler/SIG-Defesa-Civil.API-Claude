@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Bash(dotnet run *)",
+      "Bash(dotnet add *)",
+      "Bash(dotnet ef *)",
+      "Bash(npx ng *)",
+      "Bash(python3 -c \"import sys, json; lines = sys.stdin.read\\(\\).strip\\(\\).split\\('\\\\n'\\); [print\\(json.loads\\(l\\).get\\('type',''\\), json.loads\\(l\\).get\\('message',{}\\).get\\('role',''\\), str\\(json.loads\\(l\\)\\)[:200]\\) for l in lines if l]\")",
+      "Bash(powershell -Command \"Get-Content 'C:\\\\Users\\\\lucio\\\\.claude\\\\projects\\\\C--Users-lucio-Desktop-TCC-Sistema---Defesa-Civil-SIG-Defesa-Civil-API\\\\55cacb53-c942-42c0-82a9-8e7aac1a46ac.jsonl' | Select-Object -Last 30\")",
+      "Read(//c/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend/**)",
+      "Bash(npx tsc *)",
+      "Bash(Select-String -Pattern \"detalhe|nova|ERROR\")",
+      "Bash(Select-Object -First 30)",
+      "Bash(echo \"EXIT:$?\")"
+    ]
+  }
+}
