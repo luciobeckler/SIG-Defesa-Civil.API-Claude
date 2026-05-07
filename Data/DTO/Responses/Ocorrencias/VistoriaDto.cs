@@ -7,6 +7,10 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
     {
         public int Id { get; set; }
 
+        // Sequência e vínculo
+        public int Numero { get; set; }
+        public int? AgendamentoId { get; set; }
+
         // Temporais
         public DateOnly DataVistoria { get; set; }
         public TimeSpan HorarioInicio { get; set; }

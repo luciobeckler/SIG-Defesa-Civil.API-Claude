@@ -20,18 +20,37 @@ namespace SIG_Defesa_Civil.API.Services.Storage
 
         public async Task<string> CriarEstruturaPastasAsync(string protocolo)
         {
-            var pastaRaiz = Path.Combine(_settings.BasePath, protocolo, _settings.SubPastaDocumentos);
+            // Cria as três folhas da árvore de armazenamento:
+            //   [Protocolo]/Documentos/
+            //   [Protocolo]/Fotos/Fotos_do_Municipe/
+            //   [Protocolo]/Fotos/Fotos_da_Vistoria/
+            var pastas = new[]
+            {
+                Path.Combine(_settings.BasePath, protocolo, _settings.SubPastaDocumentos),
+                Path.Combine(_settings.BasePath, protocolo, _settings.SubPastaFotosMunicipe),
+                Path.Combine(_settings.BasePath, protocolo, _settings.SubPastaFotosVistoria),
+            };
+
+            var pastaRaiz = Path.Combine(_settings.BasePath, protocolo);
 
             try
             {
-                await Task.Run(() => Directory.CreateDirectory(pastaRaiz));
-                _logger.LogInformation("Estrutura de pastas criada: {Pasta}", pastaRaiz);
+                await Task.Run(() =>
+                {
+                    foreach (var pasta in pastas)
+                        Directory.CreateDirectory(pasta);
+                });
+
+                _logger.LogInformation(
+                    "Estrutura de pastas criada para protocolo {Protocolo}: {Pastas}",
+                    protocolo, string.Join(", ", pastas));
+
                 return pastaRaiz;
             }
             catch (UnauthorizedAccessException)
             {
                 throw new StorageException(
-                    $"Sem permissão para criar pasta: {pastaRaiz}",
+                    $"Sem permissão para criar pastas em: {pastaRaiz}",
                     pastaRaiz,
                     StorageErrorType.PermissaoNegada);
             }
@@ -45,11 +64,24 @@ namespace SIG_Defesa_Civil.API.Services.Storage
             catch (IOException ex)
             {
                 throw new StorageException(
-                    $"Erro de I/O ao criar pasta: {pastaRaiz}",
+                    $"Erro de I/O ao criar pastas: {pastaRaiz}",
                     ex,
                     StorageErrorType.ErroLeituraEscrita);
             }
         }
+
+        /// <summary>
+        /// Determina a subpasta de destino com base no tipo do arquivo:
+        ///   COMPROVANTE_RESIDENCIA | FICHA_VISTORIA | RELATORIO_FINAL → Documentos
+        ///   FOTO_CIDADAO                                               → Fotos/Fotos_do_Municipe
+        ///   FOTO_CAMPO                                                 → Fotos/Fotos_da_Vistoria
+        /// </summary>
+        private string ObterSubPasta(TipoArquivo tipoArquivo) => tipoArquivo switch
+        {
+            TipoArquivo.FOTO_CIDADAO   => _settings.SubPastaFotosMunicipe,
+            TipoArquivo.FOTO_CAMPO     => _settings.SubPastaFotosVistoria,
+            _                          => _settings.SubPastaDocumentos,   // COMPROVANTE, FICHA, RELATORIO
+        };
 
         public async Task<string> SalvarArquivoAsync(
             string protocolo,
@@ -57,7 +89,8 @@ namespace SIG_Defesa_Civil.API.Services.Storage
             TipoArquivo tipoArquivo,
             Stream stream)
         {
-            var caminhoRelativo = $"/{protocolo}/{_settings.SubPastaDocumentos}/{nomeArquivo}";
+            var subPasta = ObterSubPasta(tipoArquivo);
+            var caminhoRelativo = $"/{protocolo}/{subPasta}/{nomeArquivo}";
             var caminhoAbsoluto = ObterCaminhoAbsoluto(caminhoRelativo);
 
             try

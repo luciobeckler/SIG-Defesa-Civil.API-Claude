@@ -11,10 +11,13 @@ namespace SIG_Defesa_Civil.API.Services.Storage
     {
         /// <summary>
         /// Cria a estrutura de pastas para uma ocorrência no armazenamento.
-        /// Estrutura esperada: {BasePath}/{YYYY-XXXX}/Documentos/
+        /// Estrutura gerada:
+        ///   {BasePath}/{YYYY-XXXX}/Documentos/
+        ///   {BasePath}/{YYYY-XXXX}/Fotos/Fotos_do_Municipe/
+        ///   {BasePath}/{YYYY-XXXX}/Fotos/Fotos_da_Vistoria/
         /// </summary>
         /// <param name="protocolo">Protocolo da ocorrência (ex: 2026-0001)</param>
-        /// <returns>Caminho absoluto da pasta raiz criada</returns>
+        /// <returns>Caminho absoluto da pasta raiz do protocolo</returns>
         /// <exception cref="StorageException">Se houver falha ao criar pastas (permissão, disco cheio, etc)</exception>
         Task<string> CriarEstruturaPastasAsync(string protocolo);
 

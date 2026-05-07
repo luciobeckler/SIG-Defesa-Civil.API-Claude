@@ -150,13 +150,15 @@ namespace SIG_Defesa_Civil.API.Data.Models
             });
 
             // ═══════════════════════════════════════════════════════════════════════
-            // AGENDAMENTO DE VISTORIA (Etapa 3 — 1:1 dependente)
+            // AGENDAMENTO DE VISTORIA (Etapa 3 — 1:N dependente)
             // ═══════════════════════════════════════════════════════════════════════
             modelBuilder.Entity<AgendamentoVistoria>(entity =>
             {
+                entity.Property(a => a.Status).HasConversion<string>();
+
                 entity.HasOne(a => a.Ocorrencia)
-                    .WithOne(o => o.AgendamentoVistoria)
-                    .HasForeignKey<AgendamentoVistoria>(a => a.OcorrenciaId)
+                    .WithMany(o => o.Agendamentos)
+                    .HasForeignKey(a => a.OcorrenciaId)
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasOne(a => a.Vistoriador1)
@@ -173,6 +175,9 @@ namespace SIG_Defesa_Civil.API.Data.Models
                     .WithMany()
                     .HasForeignKey(a => a.AgendadoPorId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                // Garante que o número do agendamento é único por ocorrência
+                entity.HasIndex(a => new { a.OcorrenciaId, a.Numero }).IsUnique();
             });
 
             // ═══════════════════════════════════════════════════════════════════════
@@ -190,7 +195,7 @@ namespace SIG_Defesa_Civil.API.Data.Models
             });
 
             // ═══════════════════════════════════════════════════════════════════════
-            // VISTORIA PRESENCIAL (Etapa 4 — 1:1 dependente)
+            // VISTORIA PRESENCIAL (Etapa 4 — 1:N dependente)
             // ═══════════════════════════════════════════════════════════════════════
             modelBuilder.Entity<Vistoria>(entity =>
             {
@@ -205,9 +210,14 @@ namespace SIG_Defesa_Civil.API.Data.Models
                 entity.Property(v => v.Remocao).HasConversion<string>();
 
                 entity.HasOne(v => v.Ocorrencia)
-                    .WithOne(o => o.Vistoria)
-                    .HasForeignKey<Vistoria>(v => v.OcorrenciaId)
+                    .WithMany(o => o.Vistorias)
+                    .HasForeignKey(v => v.OcorrenciaId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(v => v.Agendamento)
+                    .WithMany()
+                    .HasForeignKey(v => v.AgendamentoId)
+                    .OnDelete(DeleteBehavior.SetNull);
 
                 entity.HasOne(v => v.RegistradoPor)
                     .WithMany()
@@ -216,6 +226,9 @@ namespace SIG_Defesa_Civil.API.Data.Models
 
                 entity.HasIndex(v => v.GrauRiscoEncontrado);
                 entity.HasIndex(v => v.DataVistoria);
+
+                // Garante que o número da vistoria é único por ocorrência
+                entity.HasIndex(v => new { v.OcorrenciaId, v.Numero }).IsUnique();
             });
 
             // ═══════════════════════════════════════════════════════════════════════

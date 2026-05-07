@@ -12,7 +12,15 @@
       "Bash(npx tsc *)",
       "Bash(Select-String -Pattern \"detalhe|nova|ERROR\")",
       "Bash(Select-Object -First 30)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(dir \"C:\\\\Users\\\\lucio\\\\Desktop\\\\TCC\\\\Sistema - Defesa Civil\\\\sig-defesa-civil-frontend\\\\src\\\\app\\\\shared\" /b /s)",
+      "PowerShell(Stop-Process -Id 27692 -Force -ErrorAction SilentlyContinue)",
+      "Bash(pushd \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend\")",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(popd)",
+      "Bash(npm install *)",
+      "Bash(node_modules/.bin/ng build *)",
+      "Bash(xargs grep *)"
     ]
   }
 }

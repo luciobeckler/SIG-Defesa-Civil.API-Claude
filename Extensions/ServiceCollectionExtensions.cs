@@ -1,13 +1,12 @@
 namespace SIG_Defesa_Civil.API.Extensions
 {
-    using System.Text;
     using global::SIG_Defesa_Civil.API.Data.Configuration.Auth;
     using global::SIG_Defesa_Civil.API.Data.Configuration.DocumentTemplate;
     using global::SIG_Defesa_Civil.API.Data.Configuration.Storage;
     using global::SIG_Defesa_Civil.API.Data.Models;
     using global::SIG_Defesa_Civil.API.Data.Models.Tabelas;
-    using global::SIG_Defesa_Civil.API.Services.AvaliacaoRisco;
     using global::SIG_Defesa_Civil.API.Services.Auth;
+    using global::SIG_Defesa_Civil.API.Services.AvaliacaoRisco;
     using global::SIG_Defesa_Civil.API.Services.Documento;
     using global::SIG_Defesa_Civil.API.Services.Encaminhamento;
     using global::SIG_Defesa_Civil.API.Services.Notificacao;
@@ -19,6 +18,7 @@ namespace SIG_Defesa_Civil.API.Extensions
     using Microsoft.EntityFrameworkCore;
     using Microsoft.IdentityModel.Tokens;
     using Microsoft.OpenApi.Models;
+    using System.Text;
 
     public static class ServiceCollectionExtensions
     {
@@ -37,6 +37,7 @@ namespace SIG_Defesa_Civil.API.Extensions
                         Email = "defesacivil@sabara.mg.gov.br"
                     }
                 });
+                options.CustomSchemaIds(type => type.FullName);
 
                 // Suporte a JWT no Swagger UI
                 options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme

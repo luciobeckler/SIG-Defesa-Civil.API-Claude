@@ -72,6 +72,13 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         // ── Documentos ────────────────────────────────────────────────────────────
 
         /// <summary>
+        /// Lista os arquivos de uma ocorrência para a Central de Documentos.
+        /// Aceita filtro opcional por categoria (string enum TipoArquivo).
+        /// Lança <see cref="InvalidOperationException"/> se a ocorrência não existir.
+        /// </summary>
+        Task<List<ArquivoListagemDto>> ListarArquivosAsync(int ocorrenciaId, string? tipoArquivo = null);
+
+        /// <summary>
         /// Gera documentos Word em lote via templates pré-definidos.
         /// Continua o processamento mesmo se uma geração individual falhar.
         /// </summary>

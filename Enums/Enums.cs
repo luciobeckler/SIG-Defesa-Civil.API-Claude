@@ -59,6 +59,18 @@
         MUITO_ALTO
     }
 
+    // ─── Etapa 3 — Agendamento de Vistoria ──────────────────────────────────────
+    /// <summary>
+    /// Estado do ciclo de vida de um agendamento.
+    /// ATIVO = aguardando comparecimento | CONCLUIDO = vistoria realizada | CANCELADO = descartado
+    /// </summary>
+    public enum StatusAgendamento
+    {
+        ATIVO,
+        CONCLUIDO,
+        CANCELADO
+    }
+
     // ─── Etapa 4 — Vistoria Presencial ───────────────────────────────────────────
     public enum TipoEdificacao
     {

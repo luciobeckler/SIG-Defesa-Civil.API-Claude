@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using SIG_Defesa_Civil.API.Data.DTO.Requests;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Arquivos;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
+using SIG_Defesa_Civil.API.Data.DTO.Responses.Arquivos;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias;
 using SIG_Defesa_Civil.API.Enums;
 using SIG_Defesa_Civil.API.Exceptions;
@@ -39,7 +40,8 @@ namespace SIG_Defesa_Civil.API.Controllers
         /// Cria uma nova ocorrência de Defesa Civil (Etapa 1).
         /// </summary>
         /// <param name="dados">JSON com dados estruturados (cidadão, local, descrição)</param>
-        /// <param name="arquivos">Lista de arquivos (fotos, comprovantes) via multipart/form-data</param>
+        /// <param name="comprovante">Comprovante de residência (obrigatório) → salvo em Documentos/</param>
+        /// <param name="fotos">Fotos do local tiradas pelo cidadão (obrigatório) → salvas em Fotos/Fotos_do_Municipe/</param>
         /// <returns>Protocolo gerado e dados da ocorrência criada</returns>
         /// <response code="201">Ocorrência criada com sucesso</response>
         /// <response code="400">Dados inválidos ou ausentes</response>
@@ -49,17 +51,20 @@ namespace SIG_Defesa_Civil.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<OcorrenciaCriadaDto>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
-        public async Task<IActionResult> CriarOcorrencia(
-            [FromForm] string dados,
-            [FromForm] List<IFormFile>? arquivos)
+        public async Task<IActionResult> CriarOcorrencia([FromForm] CriarOcorrenciaUploadDto upload)
         {
+            // Restaure as variáveis para o seu código atual continuar funcionando sem precisar reescrever tudo abaixo:
+            var dados = upload.Dados;
+            var comprovante = upload.Comprovante;
+            var fotos = upload.Fotos;
+
             var ipOrigem = ObterIpCliente();
             // Endpoint público — cidadãos não têm conta no sistema.
             // O ID do criador é resolvido internamente pelo serviço a partir do CPF informado.
 
             _logger.LogInformation(
-                "Recebida requisição de criação de ocorrência. IP: {IP}, Arquivos: {Count}",
-                ipOrigem, arquivos?.Count ?? 0);
+                "Recebida requisição de criação de ocorrência. IP: {IP}, Fotos: {Count}",
+                ipOrigem, fotos?.Count ?? 0);
 
             try
             {
@@ -94,17 +99,23 @@ namespace SIG_Defesa_Civil.API.Controllers
                         $"Erros de validação: {string.Join(", ", errosValidacao)}",
                         ErrosRequisicoes.VALIDACAO_FALHOU));
 
-                if (arquivos == null || arquivos.Count == 0)
+                if (comprovante == null)
                     return BadRequest(ApiResponse<object>.Error(
-                        "É obrigatório enviar ao menos uma foto ou documento",
+                        "O comprovante de residência é obrigatório",
                         ErrosRequisicoes.ARQUIVOS_AUSENTES));
 
-                request.Arquivos = arquivos.Select((arquivo, index) =>
-                    new ArquivoUploadDto
-                    {
-                        TipoArquivo = DeterminarTipoArquivo(arquivo.FileName, index),
-                        File = arquivo
-                    }).ToList();
+                if (fotos == null || fotos.Count == 0)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "É obrigatório enviar ao menos uma foto do local",
+                        ErrosRequisicoes.ARQUIVOS_AUSENTES));
+
+                // Mapeia campos tipados → ArquivoUploadDto com TipoArquivo correto
+                request.Arquivos = new List<ArquivoUploadDto>
+                {
+                    new() { TipoArquivo = TipoArquivo.COMPROVANTE_RESIDENCIA, File = comprovante }
+                };
+                request.Arquivos.AddRange(fotos.Select(f =>
+                    new ArquivoUploadDto { TipoArquivo = TipoArquivo.FOTO_CIDADAO, File = f }));
 
                 const long maxFileSize = 10 * 1024 * 1024; // 10 MB
                 var arquivoGrande = request.Arquivos.FirstOrDefault(a => a.File.Length > maxFileSize);
@@ -312,7 +323,7 @@ namespace SIG_Defesa_Civil.API.Controllers
             try
             {
                 await _ocorrenciaService.RestaurarAsync(id, ObterUsuarioIdInterno());
-                return Ok(ApiResponse<object>.Success((object?)null, "Ocorrência restaurada com sucesso"));
+                return Ok(ApiResponse<object>.Success(null, "Ocorrência restaurada com sucesso"));
             }
             catch (InvalidOperationException ex)
             {
@@ -416,6 +427,46 @@ namespace SIG_Defesa_Civil.API.Controllers
         }
 
         // ══════════════════════════════════════════════════════════════════════════
+        // GET /api/v1/ocorrencias/{id}/arquivos — Central de Documentos
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Lista os arquivos de uma ocorrência para exibição na Central de Documentos.
+        /// Suporta filtro por categoria via <paramref name="tipoArquivo"/> para lazy loading
+        /// por categoria no frontend (omitir para retornar todos os arquivos de uma vez).
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="tipoArquivo">
+        /// Filtro por categoria (string enum).
+        /// Valores aceitos: FOTO_CIDADAO | COMPROVANTE_RESIDENCIA | FICHA_VISTORIA | FOTO_CAMPO | RELATORIO_FINAL
+        /// </param>
+        /// <response code="200">Lista de arquivos da ocorrência</response>
+        /// <response code="404">Ocorrência não encontrada</response>
+        [HttpGet("{id:int}/arquivos")]
+        [ProducesResponseType(typeof(ApiResponse<List<ArquivoListagemDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ListarArquivos(
+            [FromRoute] int id,
+            [FromQuery] string? tipoArquivo)
+        {
+            try
+            {
+                var resultado = await _ocorrenciaService.ListarArquivosAsync(id, tipoArquivo);
+                return Ok(ApiResponse<List<ArquivoListagemDto>>.Success(
+                    resultado,
+                    $"{resultado.Count} arquivo(s) encontrado(s)"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"ListarArquivos({id}, {tipoArquivo})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
         // HELPERS PRIVADOS
         // ══════════════════════════════════════════════════════════════════════════
 
@@ -452,27 +503,19 @@ namespace SIG_Defesa_Civil.API.Controllers
             return erros;
         }
 
-        private static TipoArquivo DeterminarTipoArquivo(string nomeArquivo, int indice)
-        {
-            var nomeLower = nomeArquivo.ToLowerInvariant();
-            if (nomeLower.Contains("comprovante") || nomeLower.Contains("residencia"))
-                return TipoArquivo.COMPROVANTE_RESIDENCIA;
-            return TipoArquivo.FOTO_CIDADAO;
-        }
-
         private static string ObterContentType(string caminho)
         {
             var ext = Path.GetExtension(caminho).ToLowerInvariant();
             return ext switch
             {
                 ".jpg" or ".jpeg" => "image/jpeg",
-                ".png"            => "image/png",
-                ".gif"            => "image/gif",
-                ".webp"           => "image/webp",
-                ".pdf"            => "application/pdf",
-                ".doc"            => "application/msword",
-                ".docx"           => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                _                 => "application/octet-stream",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".webp" => "image/webp",
+                ".pdf" => "application/pdf",
+                ".doc" => "application/msword",
+                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                _ => "application/octet-stream",
             };
         }
     }

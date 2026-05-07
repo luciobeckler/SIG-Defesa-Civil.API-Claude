@@ -168,10 +168,11 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 .Include(o => o.CriadoPor)
                 .Include(o => o.Localizacao)
                 .Include(o => o.AvaliacaoRisco).ThenInclude(a => a!.AbertaPorUsuario)
-                .Include(o => o.AgendamentoVistoria).ThenInclude(a => a!.Vistoriador1)
-                .Include(o => o.AgendamentoVistoria).ThenInclude(a => a!.Vistoriador2)
-                .Include(o => o.AgendamentoVistoria).ThenInclude(a => a!.Tentativas)
-                .Include(o => o.Vistoria).ThenInclude(v => v!.RegistradoPor)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador2)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.AgendadoPor)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Tentativas)
+                .Include(o => o.Vistorias).ThenInclude(v => v.RegistradoPor)
                 .Include(o => o.Notificados).ThenInclude(n => n.RegistradoPor)
                 .Include(o => o.EncaminhamentoFinal).ThenInclude(e => e!.RelatorioVistoria)
                 .Include(o => o.EncaminhamentoFinal).ThenInclude(e => e!.RegistradoPor)
@@ -291,7 +292,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     .Include(o => o.Solicitante)
                     .Include(o => o.Localizacao)
                     .Include(o => o.AvaliacaoRisco)
-                    .Include(o => o.AgendamentoVistoria).ThenInclude(a => a!.Vistoriador1)
+                    .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
                     .Include(o => o.Arquivos)
                     .Where(o => o.DeletedAt == null)
                     .AsQueryable();
@@ -328,7 +329,9 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     TipificacaoInicial = o.AvaliacaoRisco?.TipificacaoInicial,
                     Emergencia = o.AvaliacaoRisco?.Emergencia,
 
-                    NomeVistoriador1 = o.AgendamentoVistoria?.Vistoriador1.Nome,
+                    NomeVistoriador1 = o.Agendamentos
+                        .OrderByDescending(a => a.Numero)
+                        .FirstOrDefault()?.Vistoriador1.Nome,
 
                     AbertaEm = o.AbertaEm,
                     AtualizadoEm = o.AtualizadoEm,
@@ -462,6 +465,41 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             }
         }
 
+        public async Task<List<ArquivoListagemDto>> ListarArquivosAsync(
+            int ocorrenciaId,
+            string? tipoArquivo = null)
+        {
+            var existe = await _context.Ocorrencias
+                .AnyAsync(o => o.Id == ocorrenciaId && o.DeletedAt == null);
+
+            if (!existe)
+                throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
+
+            var query = _context.Arquivos
+                .Include(a => a.Usuario)
+                .Where(a => a.OcorrenciaId == ocorrenciaId)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(tipoArquivo))
+                query = query.Where(a => a.TipoArquivo == tipoArquivo);
+
+            var arquivos = await query
+                .OrderBy(a => a.TipoArquivo)
+                .ThenBy(a => a.EnviadoEm)
+                .ToListAsync();
+
+            return arquivos.Select(a => new ArquivoListagemDto
+            {
+                Id              = a.Id,
+                TipoArquivo     = a.TipoArquivo,
+                NomeOriginal    = a.NomeOriginal,
+                CaminhoRelativo = a.CaminhoRelativo,
+                TamanhoBytes    = a.TamanhoBytes,
+                EnviadoPor      = a.Usuario?.Nome,
+                EnviadoEm       = a.EnviadoEm
+            }).ToList();
+        }
+
         public Task<GeracaoLoteResultadoDto> GerarDocumentosEmLoteAsync(GerarDocumentosLoteRequest request)
         {
             throw new NotImplementedException("Será implementado na Fase seguinte");
@@ -487,9 +525,9 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                                          o.AvaliacaoRisco.Emergencia == filtros.Emergencia.Value);
 
             if (filtros.VistoriadorId.HasValue)
-                query = query.Where(o => o.AgendamentoVistoria != null &&
-                                        (o.AgendamentoVistoria.Vistoriador1Id == filtros.VistoriadorId.Value ||
-                                         o.AgendamentoVistoria.Vistoriador2Id == filtros.VistoriadorId.Value));
+                query = query.Where(o => o.Agendamentos.Any(a =>
+                    a.Vistoriador1Id == filtros.VistoriadorId.Value ||
+                    a.Vistoriador2Id == filtros.VistoriadorId.Value));
 
             if (filtros.DataInicio.HasValue)
                 query = query.Where(o => o.AbertaEm >= filtros.DataInicio.Value);
@@ -550,61 +588,69 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     AtualizadoEm = o.AvaliacaoRisco.AtualizadoEm
                 },
 
-                AgendamentoVistoria = o.AgendamentoVistoria == null ? null : new AgendamentoVistoriaDto
-                {
-                    Id = o.AgendamentoVistoria.Id,
-                    Vistoriador1Id = o.AgendamentoVistoria.Vistoriador1Id,
-                    NomeVistoriador1 = o.AgendamentoVistoria.Vistoriador1.Nome,
-                    MatriculaVistoriador1 = o.AgendamentoVistoria.Vistoriador1.Matricula,
-                    Vistoriador2Id = o.AgendamentoVistoria.Vistoriador2Id,
-                    NomeVistoriador2 = o.AgendamentoVistoria.Vistoriador2?.Nome,
-                    MatriculaVistoriador2 = o.AgendamentoVistoria.Vistoriador2?.Matricula,
-                    AgendadoPor = o.AgendamentoVistoria.AgendadoPor.Nome,
-                    AgendadoEm = o.AgendamentoVistoria.AgendadoEm,
-                    Tentativas = o.AgendamentoVistoria.Tentativas
-                        .OrderBy(t => t.NumeroTentativa)
-                        .Select(t => new TentativaVistoriaDto
-                        {
-                            Id = t.Id,
-                            NumeroTentativa = t.NumeroTentativa,
-                            DataHoraTentativa = t.DataHoraTentativa,
-                            Observacao = t.Observacao
-                        }).ToList()
-                },
+                Agendamentos = o.Agendamentos
+                    .OrderBy(a => a.Numero)
+                    .Select(a => new AgendamentoVistoriaDto
+                    {
+                        Id = a.Id,
+                        Numero = a.Numero,
+                        Status = a.Status.ToString(),
+                        Vistoriador1Id = a.Vistoriador1Id,
+                        NomeVistoriador1 = a.Vistoriador1.Nome,
+                        MatriculaVistoriador1 = a.Vistoriador1.Matricula,
+                        Vistoriador2Id = a.Vistoriador2Id,
+                        NomeVistoriador2 = a.Vistoriador2?.Nome,
+                        MatriculaVistoriador2 = a.Vistoriador2?.Matricula,
+                        AgendadoPor = a.AgendadoPor.Nome,
+                        AgendadoEm = a.AgendadoEm,
+                        Tentativas = a.Tentativas
+                            .OrderBy(t => t.NumeroTentativa)
+                            .Select(t => new TentativaVistoriaDto
+                            {
+                                Id = t.Id,
+                                NumeroTentativa = t.NumeroTentativa,
+                                DataHoraTentativa = t.DataHoraTentativa,
+                                Observacao = t.Observacao
+                            }).ToList()
+                    }).ToList(),
 
-                Vistoria = o.Vistoria == null ? null : new VistoriaDto
-                {
-                    Id = o.Vistoria.Id,
-                    DataVistoria = o.Vistoria.DataVistoria,
-                    HorarioInicio = o.Vistoria.HorarioInicio,
-                    HorarioTermino = o.Vistoria.HorarioTermino,
-                    DescricaoDoLocal = o.Vistoria.DescricaoDoLocal,
-                    CaracterizacaoDoLocal = o.Vistoria.CaracterizacaoDoLocal,
-                    Edificacao = o.Vistoria.Edificacao,
-                    Estrutura = o.Vistoria.Estrutura,
-                    NumeroMoradias = o.Vistoria.NumeroMoradias,
-                    NumeroComodos = o.Vistoria.NumeroComodos,
-                    NumeroPavimentos = o.Vistoria.NumeroPavimentos,
-                    NumeroMoradiasNoLote = o.Vistoria.NumeroMoradiasNoLote,
-                    PossuiUnidadeFamiliar = o.Vistoria.PossuiUnidadeFamiliar,
-                    NumeroAdultos = o.Vistoria.NumeroAdultos,
-                    NumeroCriancas = o.Vistoria.NumeroCriancas,
-                    NumeroIdosos = o.Vistoria.NumeroIdosos,
-                    NumeroDeficientes = o.Vistoria.NumeroDeficientes,
-                    TotalMoradores = o.Vistoria.TotalMoradores,
-                    TipoRisco = o.Vistoria.TipoRisco,
-                    GrauRiscoEncontrado = o.Vistoria.GrauRiscoEncontrado,
-                    TipificacaoOcorrencia = o.Vistoria.TipificacaoOcorrencia,
-                    RegimeOcupacao = o.Vistoria.RegimeOcupacao,
-                    Motivacao = o.Vistoria.Motivacao,
-                    AreasAfetadas = o.Vistoria.AreasAfetadas,
-                    Interdicao = o.Vistoria.Interdicao,
-                    Remocao = o.Vistoria.Remocao,
-                    Orientacoes = o.Vistoria.Orientacoes,
-                    EncaminhamentosDeCampo = o.Vistoria.EncaminhamentosDeCampo,
-                    RegistradoPor = o.Vistoria.RegistradoPor.Nome,
-                    RegistradoEm = o.Vistoria.RegistradoEm
-                },
+                Vistorias = o.Vistorias
+                    .OrderBy(v => v.Numero)
+                    .Select(v => new VistoriaDto
+                    {
+                        Id = v.Id,
+                        Numero = v.Numero,
+                        AgendamentoId = v.AgendamentoId,
+                        DataVistoria = v.DataVistoria,
+                        HorarioInicio = v.HorarioInicio,
+                        HorarioTermino = v.HorarioTermino,
+                        DescricaoDoLocal = v.DescricaoDoLocal,
+                        CaracterizacaoDoLocal = v.CaracterizacaoDoLocal,
+                        Edificacao = v.Edificacao,
+                        Estrutura = v.Estrutura,
+                        NumeroMoradias = v.NumeroMoradias,
+                        NumeroComodos = v.NumeroComodos,
+                        NumeroPavimentos = v.NumeroPavimentos,
+                        NumeroMoradiasNoLote = v.NumeroMoradiasNoLote,
+                        PossuiUnidadeFamiliar = v.PossuiUnidadeFamiliar,
+                        NumeroAdultos = v.NumeroAdultos,
+                        NumeroCriancas = v.NumeroCriancas,
+                        NumeroIdosos = v.NumeroIdosos,
+                        NumeroDeficientes = v.NumeroDeficientes,
+                        TotalMoradores = v.TotalMoradores,
+                        TipoRisco = v.TipoRisco,
+                        GrauRiscoEncontrado = v.GrauRiscoEncontrado,
+                        TipificacaoOcorrencia = v.TipificacaoOcorrencia,
+                        RegimeOcupacao = v.RegimeOcupacao,
+                        Motivacao = v.Motivacao,
+                        AreasAfetadas = v.AreasAfetadas,
+                        Interdicao = v.Interdicao,
+                        Remocao = v.Remocao,
+                        Orientacoes = v.Orientacoes,
+                        EncaminhamentosDeCampo = v.EncaminhamentosDeCampo,
+                        RegistradoPor = v.RegistradoPor.Nome,
+                        RegistradoEm = v.RegistradoEm
+                    }).ToList(),
 
                 Notificados = o.Notificados.Select(n => new NotificadoDto
                 {

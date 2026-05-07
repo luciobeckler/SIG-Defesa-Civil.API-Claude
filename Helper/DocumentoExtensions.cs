@@ -15,7 +15,8 @@ namespace SIG_Defesa_Civil.API.Helper
             var loc = ocorrencia.Localizacao;
             var sol = ocorrencia.Solicitante;
             var av  = ocorrencia.AvaliacaoRisco;
-            var ag  = ocorrencia.AgendamentoVistoria;
+            // Usa o agendamento mais recente (maior Numero) para preencher vistoriadores
+            var ag  = ocorrencia.Agendamentos.OrderByDescending(a => a.Numero).FirstOrDefault();
 
             return new Dictionary<string, string>
             {
@@ -50,8 +51,8 @@ namespace SIG_Defesa_Civil.API.Helper
                 { "VISTORIADOR_1", ag?.Vistoriador1.Nome ?? "Não atribuído" },
                 { "VISTORIADOR_2", ag?.Vistoriador2?.Nome ?? "Não atribuído" },
 
-                // Datas calculadas a partir do status atual
-                { "DATA_VISTORIA",  ocorrencia.Vistoria?.DataVistoria.ToString("dd/MM/yyyy") ?? "Pendente" },
+                // Datas calculadas a partir do status atual (usa a vistoria mais recente se houver)
+                { "DATA_VISTORIA",  ocorrencia.Vistorias.OrderByDescending(v => v.Numero).FirstOrDefault()?.DataVistoria.ToString("dd/MM/yyyy") ?? "Pendente" },
                 { "DATA_ENCERRAMENTO", ocorrencia.EncaminhamentoFinal?.RegistradoEm.ToString("dd/MM/yyyy HH:mm") ?? "Em andamento" }
             };
         }

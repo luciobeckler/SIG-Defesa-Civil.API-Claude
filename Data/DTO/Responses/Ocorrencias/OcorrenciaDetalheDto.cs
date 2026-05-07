@@ -27,13 +27,13 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         /// <summary>Null enquanto a Etapa 2 não for preenchida.</summary>
         public AvaliacaoRiscoDto? AvaliacaoRisco { get; set; }
 
-        // ── Etapa 3: Agendamento de Vistoria ──────────────────────────────────────
-        /// <summary>Null enquanto a Etapa 3 não for preenchida.</summary>
-        public AgendamentoVistoriaDto? AgendamentoVistoria { get; set; }
+        // ── Etapa 3: Agendamentos de Vistoria ─────────────────────────────────────
+        /// <summary>Todos os agendamentos desta ocorrência, em ordem crescente de Numero. Lista vazia antes da Etapa 3.</summary>
+        public List<AgendamentoVistoriaDto> Agendamentos { get; set; } = new();
 
-        // ── Etapa 4: Vistoria Presencial ──────────────────────────────────────────
-        /// <summary>Null enquanto a Etapa 4 não for preenchida.</summary>
-        public VistoriaDto? Vistoria { get; set; }
+        // ── Etapa 4: Vistorias Presenciais ────────────────────────────────────────
+        /// <summary>Todas as vistorias desta ocorrência, em ordem crescente de Numero. Lista vazia antes da Etapa 4.</summary>
+        public List<VistoriaDto> Vistorias { get; set; } = new();
 
         // ── Etapa 5: Notificações ─────────────────────────────────────────────────
         /// <summary>Lista vazia enquanto a Etapa 5 não for preenchida.</summary>

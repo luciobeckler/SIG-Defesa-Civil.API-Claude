@@ -5,6 +5,10 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
     {
         public int Id { get; set; }
 
+        // Sequência e estado
+        public int Numero { get; set; }
+        public string Status { get; set; } = string.Empty;
+
         // Equipe designada
         public int Vistoriador1Id { get; set; }
         public string NomeVistoriador1 { get; set; } = string.Empty;

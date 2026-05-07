@@ -5,7 +5,7 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
 {
     /// <summary>
     /// Gerencia o agendamento (Etapa 3) e a execução da vistoria presencial (Etapa 4).
-    /// As duas etapas são agrupadas neste serviço por coesão — a vistoria depende do agendamento.
+    /// Ambas as etapas suportam multiplicidade: uma ocorrência pode ter N agendamentos e N vistorias.
     /// </summary>
     public interface IVistoriaService
     {
@@ -13,8 +13,9 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
 
         /// <summary>
         /// Designa a equipe de vistoriadores e registra a primeira tentativa.
-        /// Pré-condição: ocorrência deve estar em EM_AVALIACAO.
-        /// Status avança para VISTORIA_SOLICITADA.
+        /// Pré-condição: ocorrência deve estar em EM_AVALIACAO (primeiro agendamento)
+        /// ou em VISTORIA_SOLICITADA (re-agendamento).
+        /// Status avança para VISTORIA_SOLICITADA se ainda não estiver.
         /// </summary>
         Task<AgendamentoVistoriaDto> AgendarAsync(
             int ocorrenciaId,
@@ -22,10 +23,14 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             int usuarioId);
 
         /// <summary>
-        /// Retorna o agendamento da ocorrência.
-        /// Retorna null se a Etapa 3 ainda não foi preenchida.
+        /// Retorna todos os agendamentos da ocorrência em ordem crescente de Numero.
         /// </summary>
-        Task<AgendamentoVistoriaDto?> ObterAgendamentoPorOcorrenciaAsync(int ocorrenciaId);
+        Task<List<AgendamentoVistoriaDto>> ListarAgendamentosAsync(int ocorrenciaId);
+
+        /// <summary>
+        /// Retorna um agendamento específico pelo seu ID.
+        /// </summary>
+        Task<AgendamentoVistoriaDto?> ObterAgendamentoPorIdAsync(int agendamentoId);
 
         /// <summary>
         /// Adiciona uma nova tentativa de comparecimento a um agendamento existente.
@@ -42,6 +47,7 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
         /// Registra o resultado da vistoria presencial de campo.
         /// Pré-condição: ocorrência deve estar em VISTORIA_SOLICITADA.
         /// Status avança para VISTORIA_REALIZADA.
+        /// Se request.AgendamentoId informado, marca o agendamento como CONCLUIDO.
         /// </summary>
         Task<VistoriaDto> RegistrarVistoriaAsync(
             int ocorrenciaId,
@@ -49,17 +55,36 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             int usuarioId);
 
         /// <summary>
-        /// Retorna a vistoria presencial de uma ocorrência.
-        /// Retorna null se a Etapa 4 ainda não foi preenchida.
+        /// Retorna todas as vistorias da ocorrência em ordem crescente de Numero.
         /// </summary>
-        Task<VistoriaDto?> ObterVistoriaPorOcorrenciaAsync(int ocorrenciaId);
+        Task<List<VistoriaDto>> ListarVistoriasAsync(int ocorrenciaId);
 
         /// <summary>
-        /// Atualiza os dados da vistoria presencial registrada.
+        /// Retorna uma vistoria específica pelo seu ID.
         /// </summary>
-        Task<VistoriaDto> AtualizarVistoriaAsync(
-            int ocorrenciaId,
+        Task<VistoriaDto?> ObterVistoriaPorIdAsync(int vistoriaId);
+
+        /// <summary>
+        /// Atualiza os dados de uma vistoria presencial já registrada (por ID).
+        /// </summary>
+        Task<VistoriaDto> AtualizarVistoriaPorIdAsync(
+            int vistoriaId,
             RegistrarVistoriaRequest request,
+            int usuarioId);
+
+        /// <summary>
+        /// Adiciona fotos de campo (FOTO_CAMPO) a uma vistoria já registrada.
+        /// Os arquivos são salvos em [Protocolo]/Fotos/Fotos_da_Vistoria/.
+        /// </summary>
+        /// <param name="ocorrenciaId">ID da ocorrência dona da vistoria</param>
+        /// <param name="vistoriaId">ID da vistoria que receberá as fotos</param>
+        /// <param name="fotos">Arquivos de foto de campo</param>
+        /// <param name="usuarioId">ID do usuário que está fazendo o upload</param>
+        /// <returns>Número de fotos salvas</returns>
+        Task<int> AdicionarFotosCampoAsync(
+            int ocorrenciaId,
+            int vistoriaId,
+            List<IFormFile> fotos,
             int usuarioId);
     }
 }

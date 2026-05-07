@@ -9,6 +9,12 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
     /// </summary>
     public class RegistrarVistoriaRequest
     {
+        /// <summary>
+        /// ID do agendamento ao qual esta vistoria está vinculada (opcional).
+        /// Se informado, o agendamento terá seu status atualizado para CONCLUIDO.
+        /// </summary>
+        public int? AgendamentoId { get; set; }
+
         // ── Dados temporais ───────────────────────────────────────────────────────
         [Required] public DateOnly DataVistoria { get; set; }
         [Required] public TimeSpan HorarioInicio { get; set; }

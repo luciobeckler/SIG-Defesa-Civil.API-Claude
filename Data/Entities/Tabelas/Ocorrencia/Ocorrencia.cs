@@ -45,9 +45,11 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
 
         // ── Navegação: Etapas filhas (1:1) ───────────────────────────────────────
         public AvaliacaoRisco? AvaliacaoRisco { get; set; }
-        public AgendamentoVistoria? AgendamentoVistoria { get; set; }
-        public Vistoria? Vistoria { get; set; }
         public EncaminhamentoFinal? EncaminhamentoFinal { get; set; }
+
+        // ── Navegação: Etapas filhas (1:N — multiplicidade por ocorrência) ────────
+        public ICollection<AgendamentoVistoria> Agendamentos { get; set; } = new List<AgendamentoVistoria>();
+        public ICollection<Vistoria> Vistorias { get; set; } = new List<Vistoria>();
 
         // ── Navegação: Etapas filhas (1:N) ───────────────────────────────────────
         public ICollection<Notificado> Notificados { get; set; } = new List<Notificado>();

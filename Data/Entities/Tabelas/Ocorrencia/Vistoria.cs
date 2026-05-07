@@ -7,15 +7,24 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
     /// <summary>
     /// Resultado da vistoria presencial de campo.
     /// Etapa 4 do fluxo. Cria este registro → status avança para VISTORIA_REALIZADA.
+    /// Uma ocorrência pode ter múltiplas vistorias (1:N) — cada uma com seu número sequencial.
     /// </summary>
     [Table("vistorias")]
     public class Vistoria
     {
         public int Id { get; set; }
 
-        // FK (dependente da ocorrência — 1:1)
+        // FK (dependente da ocorrência — 1:N)
         public int OcorrenciaId { get; set; }
         public Ocorrencia Ocorrencia { get; set; } = null!;
+
+        // ── Sequência e vínculo ──────────────────────────────────────────────────
+        /// <summary>Número sequencial dentro da ocorrência (1 = primeira vistoria realizada).</summary>
+        public int Numero { get; set; } = 1;
+
+        /// <summary>Agendamento ao qual esta vistoria está vinculada (opcional).</summary>
+        public int? AgendamentoId { get; set; }
+        public AgendamentoVistoria? Agendamento { get; set; }
 
         // ── Dados temporais ───────────────────────────────────────────────────────
         public DateOnly DataVistoria { get; set; }
