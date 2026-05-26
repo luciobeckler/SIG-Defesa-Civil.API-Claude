@@ -179,7 +179,7 @@ namespace SIG_Defesa_Civil.API.Extensions
                 {
                     var s3Config = new AmazonS3Config
                     {
-                        ServiceURL    = r2Settings.ServiceUrl,
+                        ServiceURL = r2Settings.ServiceUrl,
                         ForcePathStyle = true,
                     };
                     return new AmazonS3Client(
