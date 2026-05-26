@@ -72,10 +72,13 @@ namespace SIG_Defesa_Civil.API.Services.Storage
             {
                 var request = new PutObjectRequest
                 {
-                    BucketName    = _settings.BucketName,
-                    Key           = s3Key,
-                    InputStream   = stream,
-                    AutoCloseStream = false,
+                    BucketName          = _settings.BucketName,
+                    Key                 = s3Key,
+                    InputStream         = stream,
+                    AutoCloseStream     = false,
+                    // R2 não suporta STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER.
+                    // DisablePayloadSigning força o modo UNSIGNED-PAYLOAD, compatível com R2.
+                    DisablePayloadSigning = true,
                 };
 
                 await _s3.PutObjectAsync(request);
