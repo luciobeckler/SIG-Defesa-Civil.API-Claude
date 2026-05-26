@@ -73,6 +73,12 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             int usuarioId);
 
         /// <summary>
+        /// Remove um agendamento e suas tentativas de comparecimento.
+        /// Lança <see cref="InvalidOperationException"/> se o agendamento não pertencer à ocorrência.
+        /// </summary>
+        Task ExcluirAgendamentoAsync(int ocorrenciaId, int agendamentoId, int usuarioId);
+
+        /// <summary>
         /// Adiciona fotos de campo (FOTO_CAMPO) a uma vistoria já registrada.
         /// Os arquivos são salvos em [Protocolo]/Fotos/Fotos_da_Vistoria/.
         /// </summary>

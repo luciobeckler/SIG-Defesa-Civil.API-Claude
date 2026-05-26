@@ -83,8 +83,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<DateTime>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Encaminhamentos")
-                        .HasColumnType("text");
+                    b.Property<int[]>("Encaminhamentos")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
 
                     b.Property<string>("EntregaRelatorio")
                         .IsRequired()
@@ -283,15 +284,15 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<int?>("AgendamentoId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("AreasAfetadas")
+                    b.Property<int[]>("AreasAfetadas")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("integer[]");
 
                     b.Property<DateTime>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CaracterizacaoDoLocal")
-                        .HasColumnType("text");
+                    b.Property<int?>("CaracterizacaoDoLocal")
+                        .HasColumnType("integer");
 
                     b.Property<DateOnly>("DataVistoria")
                         .HasColumnType("date");
@@ -303,8 +304,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("EncaminhamentosDeCampo")
-                        .HasColumnType("text");
+                    b.Property<int[]>("EncaminhamentosDeCampo")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
 
                     b.Property<string>("Estrutura")
                         .IsRequired()
@@ -324,8 +326,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Motivacao")
-                        .HasColumnType("text");
+                    b.Property<int[]>("Motivacao")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
 
                     b.Property<int>("Numero")
                         .HasColumnType("integer");
@@ -354,11 +357,15 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<int>("NumeroPavimentos")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Observacoes")
+                        .HasColumnType("text");
+
                     b.Property<int>("OcorrenciaId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Orientacoes")
-                        .HasColumnType("text");
+                    b.Property<int[]>("Orientacoes")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
 
                     b.Property<bool>("PossuiUnidadeFamiliar")
                         .HasColumnType("boolean");
@@ -377,9 +384,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("TipificacaoOcorrencia")
+                    b.Property<int[]>("TipificacaoOcorrencia")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("integer[]");
 
                     b.Property<string>("TipoRisco")
                         .IsRequired()

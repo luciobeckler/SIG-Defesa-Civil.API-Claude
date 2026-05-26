@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace SIG_Defesa_Civil.API.Migrations
 {
     /// <inheritdoc />
-    public partial class adicionandodateonly : Migration
+    public partial class Alteracaonafichadevistoria : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -85,6 +85,8 @@ namespace SIG_Defesa_Civil.API.Migrations
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     OcorrenciaId = table.Column<int>(type: "integer", nullable: false),
+                    Numero = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<string>(type: "text", nullable: false),
                     Vistoriador1Id = table.Column<int>(type: "integer", nullable: false),
                     Vistoriador2Id = table.Column<int>(type: "integer", nullable: true),
                     AgendadoPorId = table.Column<int>(type: "integer", nullable: false),
@@ -270,61 +272,6 @@ namespace SIG_Defesa_Civil.API.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "vistorias",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    OcorrenciaId = table.Column<int>(type: "integer", nullable: false),
-                    DataVistoria = table.Column<DateOnly>(type: "date", nullable: false),
-                    HorarioInicio = table.Column<TimeSpan>(type: "interval", nullable: false),
-                    HorarioTermino = table.Column<TimeSpan>(type: "interval", nullable: false),
-                    DescricaoDoLocal = table.Column<string>(type: "text", nullable: true),
-                    CaracterizacaoDoLocal = table.Column<string>(type: "text", nullable: true),
-                    Edificacao = table.Column<string>(type: "text", nullable: false),
-                    Estrutura = table.Column<string>(type: "text", nullable: false),
-                    NumeroMoradias = table.Column<int>(type: "integer", nullable: false),
-                    NumeroComodos = table.Column<int>(type: "integer", nullable: false),
-                    NumeroPavimentos = table.Column<int>(type: "integer", nullable: false),
-                    NumeroMoradiasNoLote = table.Column<int>(type: "integer", nullable: false),
-                    PossuiUnidadeFamiliar = table.Column<bool>(type: "boolean", nullable: false),
-                    NumeroAdultos = table.Column<int>(type: "integer", nullable: false),
-                    NumeroCriancas = table.Column<int>(type: "integer", nullable: false),
-                    NumeroIdosos = table.Column<int>(type: "integer", nullable: false),
-                    NumeroDeficientes = table.Column<int>(type: "integer", nullable: false),
-                    TotalMoradores = table.Column<int>(type: "integer", nullable: false),
-                    TipoRisco = table.Column<string>(type: "text", nullable: false),
-                    GrauRiscoEncontrado = table.Column<string>(type: "text", nullable: false),
-                    TipificacaoOcorrencia = table.Column<string>(type: "text", nullable: false),
-                    RegimeOcupacao = table.Column<string>(type: "text", nullable: false),
-                    Motivacao = table.Column<string>(type: "text", nullable: true),
-                    AreasAfetadas = table.Column<string>(type: "text", nullable: false),
-                    Interdicao = table.Column<string>(type: "text", nullable: false),
-                    Remocao = table.Column<string>(type: "text", nullable: false),
-                    Orientacoes = table.Column<string>(type: "text", nullable: true),
-                    EncaminhamentosDeCampo = table.Column<string>(type: "text", nullable: true),
-                    RegistradoPorId = table.Column<int>(type: "integer", nullable: false),
-                    RegistradoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    AtualizadoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_vistorias", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_vistorias_ocorrencias_OcorrenciaId",
-                        column: x => x.OcorrenciaId,
-                        principalTable: "ocorrencias",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_vistorias_usuarios_RegistradoPorId",
-                        column: x => x.RegistradoPorId,
-                        principalTable: "usuarios",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "tentativas_vistoria",
                 columns: table => new
                 {
@@ -348,13 +295,77 @@ namespace SIG_Defesa_Civil.API.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "vistorias",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    OcorrenciaId = table.Column<int>(type: "integer", nullable: false),
+                    Numero = table.Column<int>(type: "integer", nullable: false),
+                    AgendamentoId = table.Column<int>(type: "integer", nullable: true),
+                    DataVistoria = table.Column<DateOnly>(type: "date", nullable: false),
+                    HorarioInicio = table.Column<TimeSpan>(type: "interval", nullable: false),
+                    HorarioTermino = table.Column<TimeSpan>(type: "interval", nullable: false),
+                    DescricaoDoLocal = table.Column<string>(type: "text", nullable: true),
+                    CaracterizacaoDoLocal = table.Column<int>(type: "integer", nullable: true),
+                    Edificacao = table.Column<string>(type: "text", nullable: false),
+                    Estrutura = table.Column<string>(type: "text", nullable: false),
+                    NumeroMoradias = table.Column<int>(type: "integer", nullable: false),
+                    NumeroComodos = table.Column<int>(type: "integer", nullable: false),
+                    NumeroPavimentos = table.Column<int>(type: "integer", nullable: false),
+                    NumeroMoradiasNoLote = table.Column<int>(type: "integer", nullable: false),
+                    PossuiUnidadeFamiliar = table.Column<bool>(type: "boolean", nullable: false),
+                    NumeroAdultos = table.Column<int>(type: "integer", nullable: false),
+                    NumeroCriancas = table.Column<int>(type: "integer", nullable: false),
+                    NumeroIdosos = table.Column<int>(type: "integer", nullable: false),
+                    NumeroDeficientes = table.Column<int>(type: "integer", nullable: false),
+                    TotalMoradores = table.Column<int>(type: "integer", nullable: false),
+                    TipoRisco = table.Column<string>(type: "text", nullable: false),
+                    GrauRiscoEncontrado = table.Column<string>(type: "text", nullable: false),
+                    TipificacaoOcorrencia = table.Column<int[]>(type: "integer[]", nullable: false),
+                    RegimeOcupacao = table.Column<string>(type: "text", nullable: false),
+                    Motivacao = table.Column<int[]>(type: "integer[]", nullable: false),
+                    AreasAfetadas = table.Column<int[]>(type: "integer[]", nullable: false),
+                    Interdicao = table.Column<string>(type: "text", nullable: false),
+                    Remocao = table.Column<string>(type: "text", nullable: false),
+                    Orientacoes = table.Column<int[]>(type: "integer[]", nullable: false),
+                    Observacoes = table.Column<string>(type: "text", nullable: true),
+                    EncaminhamentosDeCampo = table.Column<int[]>(type: "integer[]", nullable: false),
+                    RegistradoPorId = table.Column<int>(type: "integer", nullable: false),
+                    RegistradoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    AtualizadoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_vistorias", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_vistorias_agendamentos_vistoria_AgendamentoId",
+                        column: x => x.AgendamentoId,
+                        principalTable: "agendamentos_vistoria",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_vistorias_ocorrencias_OcorrenciaId",
+                        column: x => x.OcorrenciaId,
+                        principalTable: "ocorrencias",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_vistorias_usuarios_RegistradoPorId",
+                        column: x => x.RegistradoPorId,
+                        principalTable: "usuarios",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "encaminhamentos_finais",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     OcorrenciaId = table.Column<int>(type: "integer", nullable: false),
-                    Encaminhamentos = table.Column<string>(type: "text", nullable: true),
+                    Encaminhamentos = table.Column<int[]>(type: "integer[]", nullable: false),
                     RetornoEncaminhamentos = table.Column<string>(type: "text", nullable: true),
                     RelatorioVistoriaId = table.Column<int>(type: "integer", nullable: true),
                     EntregaRelatorio = table.Column<string>(type: "text", nullable: false),
@@ -426,9 +437,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                 column: "AgendadoPorId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_agendamentos_vistoria_OcorrenciaId",
+                name: "IX_agendamentos_vistoria_OcorrenciaId_Numero",
                 table: "agendamentos_vistoria",
-                column: "OcorrenciaId",
+                columns: new[] { "OcorrenciaId", "Numero" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -604,6 +615,11 @@ namespace SIG_Defesa_Civil.API.Migrations
                 column: "Email");
 
             migrationBuilder.CreateIndex(
+                name: "IX_vistorias_AgendamentoId",
+                table: "vistorias",
+                column: "AgendamentoId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_vistorias_DataVistoria",
                 table: "vistorias",
                 column: "DataVistoria");
@@ -614,9 +630,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                 column: "GrauRiscoEncontrado");
 
             migrationBuilder.CreateIndex(
-                name: "IX_vistorias_OcorrenciaId",
+                name: "IX_vistorias_OcorrenciaId_Numero",
                 table: "vistorias",
-                column: "OcorrenciaId",
+                columns: new[] { "OcorrenciaId", "Numero" },
                 unique: true);
 
             migrationBuilder.CreateIndex(

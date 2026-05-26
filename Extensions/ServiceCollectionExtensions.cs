@@ -1,5 +1,6 @@
 namespace SIG_Defesa_Civil.API.Extensions
 {
+    using Amazon.S3;
     using global::SIG_Defesa_Civil.API.Data.Configuration.Auth;
     using global::SIG_Defesa_Civil.API.Data.Configuration.DocumentTemplate;
     using global::SIG_Defesa_Civil.API.Data.Configuration.Storage;
@@ -11,6 +12,7 @@ namespace SIG_Defesa_Civil.API.Extensions
     using global::SIG_Defesa_Civil.API.Services.Encaminhamento;
     using global::SIG_Defesa_Civil.API.Services.Notificacao;
     using global::SIG_Defesa_Civil.API.Services.Ocorrencia;
+    using global::SIG_Defesa_Civil.API.Services.Relatorio;
     using global::SIG_Defesa_Civil.API.Services.Storage;
     using global::SIG_Defesa_Civil.API.Services.Vistoria;
     using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -75,9 +77,19 @@ namespace SIG_Defesa_Civil.API.Extensions
         }
 
         public static IServiceCollection AddDatabaseConfiguration(
-            this IServiceCollection services, IConfiguration configuration)
+            this IServiceCollection services,
+            IConfiguration configuration,
+            IWebHostEnvironment environment
+            )
         {
-            var connectionString = configuration.GetConnectionString("DevConnection");
+            string connectionKey = environment.IsDevelopment() ? "DevConnection" : "ProdConnection";
+
+            var connectionString = configuration.GetConnectionString(connectionKey);
+
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                throw new InvalidOperationException($"A string de conexão '{connectionKey}' não foi encontrada na configuração.");
+            }
 
             services.AddDbContext<DefesaCivilContext>(options =>
                 options.UseNpgsql(connectionString));
@@ -155,14 +167,39 @@ namespace SIG_Defesa_Civil.API.Extensions
             // Serviços — Auth
             services.AddScoped<IAuthService, AuthService>();
 
-            // Serviços — Domínio
-            services.AddScoped<IStorageService, LocalFileSystemStorageService>();
+            // ── Storage: R2 (produção) ou LocalFileSystem (desenvolvimento) ────────
+            // Ativação automática: se R2Storage:AccountId estiver preenchido → R2.
+            // Variáveis de ambiente no Render: R2Storage__AccountId, R2Storage__AccessKeyId,
+            //   R2Storage__SecretAccessKey, R2Storage__BucketName
+            var r2Settings = configuration.GetSection("R2Storage").Get<R2StorageSettings>();
+            if (r2Settings?.IsConfigured == true)
+            {
+                services.Configure<R2StorageSettings>(configuration.GetSection("R2Storage"));
+                services.AddSingleton<IAmazonS3>(_ =>
+                {
+                    var s3Config = new AmazonS3Config
+                    {
+                        ServiceURL    = r2Settings.ServiceUrl,
+                        ForcePathStyle = true,
+                    };
+                    return new AmazonS3Client(
+                        r2Settings.AccessKeyId,
+                        r2Settings.SecretAccessKey,
+                        s3Config);
+                });
+                services.AddScoped<IStorageService, R2StorageService>();
+            }
+            else
+            {
+                services.AddScoped<IStorageService, LocalFileSystemStorageService>();
+            }
             services.AddScoped<IOcorrenciaService, OcorrenciaService>();
             services.AddScoped<IDocumentoService, DocumentoService>();
             services.AddScoped<IAvaliacaoRiscoService, AvaliacaoRiscoService>();
             services.AddScoped<IVistoriaService, VistoriaService>();
             services.AddScoped<INotificacaoService, NotificacaoService>();
             services.AddScoped<IEncaminhamentoService, EncaminhamentoService>();
+            services.AddScoped<IRelatorioService, RelatorioService>();
 
             return services;
         }

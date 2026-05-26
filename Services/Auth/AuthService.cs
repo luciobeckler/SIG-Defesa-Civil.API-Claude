@@ -12,6 +12,7 @@ namespace SIG_Defesa_Civil.API.Services.Auth
     using SIG_Defesa_Civil.API.Data.DTO.Responses.Auth;
     using SIG_Defesa_Civil.API.Data.Models;
     using SIG_Defesa_Civil.API.Data.Models.Tabelas;
+    using SIG_Defesa_Civil.API.Enums;
 
     public class AuthService : IAuthService
     {
@@ -54,6 +55,9 @@ namespace SIG_Defesa_Civil.API.Services.Auth
 
         public async Task<UsuarioResponseDto> CriarUsuarioAsync(CriarUsuarioRequest request)
         {
+            if (request.TipoUsuario != TipoUsuario.CIDADAO && string.IsNullOrWhiteSpace(request.Matricula))
+                throw new InvalidOperationException("A matrícula é obrigatória para usuários não-cidadãos.");
+
             var emailExiste = await _context.Usuarios
                 .AnyAsync(u => u.Email == request.Email);
 

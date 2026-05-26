@@ -276,6 +276,36 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 "Ocorrência {Protocolo} restaurada pelo usuário {UsuarioId}", ocorrencia.Protocolo, usuarioId);
         }
 
+        public async Task<OcorrenciaDetalheDto> AcompanharAsync(string protocolo, string cpf)
+        {
+            var cpfNormalizado = new string(cpf.Where(char.IsDigit).ToArray());
+
+            var ocorrencia = await _context.Ocorrencias
+                .Include(o => o.Solicitante)
+                .Include(o => o.CriadoPor)
+                .Include(o => o.Localizacao)
+                .Include(o => o.AvaliacaoRisco).ThenInclude(a => a!.AbertaPorUsuario)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador2)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.AgendadoPor)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Tentativas)
+                .Include(o => o.Vistorias).ThenInclude(v => v.RegistradoPor)
+                .Include(o => o.Notificados).ThenInclude(n => n.RegistradoPor)
+                .Include(o => o.EncaminhamentoFinal).ThenInclude(e => e!.RelatorioVistoria)
+                .Include(o => o.EncaminhamentoFinal).ThenInclude(e => e!.RegistradoPor)
+                .Include(o => o.Arquivos)
+                .Where(o => o.DeletedAt == null)
+                .FirstOrDefaultAsync(o => o.Protocolo == protocolo)
+                ?? throw new InvalidOperationException($"Protocolo '{protocolo}' não encontrado.");
+
+            var cpfSolicitante = new string((ocorrencia.Solicitante?.Cpf ?? "").Where(char.IsDigit).ToArray());
+            if (cpfSolicitante != cpfNormalizado)
+                throw new UnauthorizedAccessException(
+                    "O CPF informado não corresponde ao solicitante desta ocorrência.");
+
+            return MapearDetalhe(ocorrencia);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════════
         // LISTAGEM E LGPD
         // ═══════════════════════════════════════════════════════════════════════════
@@ -293,6 +323,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     .Include(o => o.Localizacao)
                     .Include(o => o.AvaliacaoRisco)
                     .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
+                    .Include(o => o.Vistorias)
                     .Include(o => o.Arquivos)
                     .Where(o => o.DeletedAt == null)
                     .AsQueryable();
@@ -328,6 +359,10 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     GrauRiscoInicial = o.AvaliacaoRisco?.GrauRiscoInicial,
                     TipificacaoInicial = o.AvaliacaoRisco?.TipificacaoInicial,
                     Emergencia = o.AvaliacaoRisco?.Emergencia,
+
+                    GrauRiscoEfetivo = o.Vistorias.Any()
+                        ? o.Vistorias.OrderByDescending(v => v.Numero).First().GrauRiscoEncontrado
+                        : o.AvaliacaoRisco?.GrauRiscoInicial,
 
                     NomeVistoriador1 = o.Agendamentos
                         .OrderByDescending(a => a.Numero)
@@ -440,15 +475,17 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         IpOrigem = ipOrigem
                     },
 
-                    Documentos = ocorrencia.Arquivos.Select(a => new DocumentoVisualizacao
-                    {
-                        NomeOriginal = a.NomeOriginal,
-                        TipoArquivo = Enum.Parse<TipoArquivo>(a.TipoArquivo),
-                        CaminhoRelativo = a.CaminhoRelativo,
-                        TamanhoBytes = a.TamanhoBytes,
-                        EnviadoPorUserId = a.EnviadoPorUserId,
-                        EnviadoEm = a.EnviadoEm
-                    }).ToList()
+                    Documentos = ocorrencia.Arquivos
+                        .Where(a => Enum.TryParse<TipoArquivo>(a.TipoArquivo, out _))
+                        .Select(a => new DocumentoVisualizacao
+                        {
+                            NomeOriginal     = a.NomeOriginal,
+                            TipoArquivo      = Enum.Parse<TipoArquivo>(a.TipoArquivo),
+                            CaminhoRelativo  = a.CaminhoRelativo,
+                            TamanhoBytes     = a.TamanhoBytes,
+                            EnviadoPorUserId = a.EnviadoPorUserId,
+                            EnviadoEm        = a.EnviadoEm
+                        }).ToList()
                 };
             }
             catch (UnauthorizedAccessException)
@@ -503,6 +540,70 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         public Task<GeracaoLoteResultadoDto> GerarDocumentosEmLoteAsync(GerarDocumentosLoteRequest request)
         {
             throw new NotImplementedException("Será implementado na Fase seguinte");
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // ASSINATURA DO MUNÍCIPE
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        public async Task SalvarAssinaturaAsync(int ocorrenciaId, int vistoriaId, IFormFile arquivo, int usuarioId)
+        {
+            var ocorrencia = await _context.Ocorrencias
+                .FirstOrDefaultAsync(o => o.Id == ocorrenciaId && o.DeletedAt == null)
+                ?? throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
+
+            // Garante que a vistoria pertence à ocorrência
+            var vistoriaExiste = await _context.Vistorias
+                .AnyAsync(v => v.Id == vistoriaId && v.OcorrenciaId == ocorrenciaId);
+            if (!vistoriaExiste)
+                throw new InvalidOperationException(
+                    $"Vistoria {vistoriaId} não encontrada para a ocorrência {ocorrenciaId}.");
+
+            // Nome determinístico: permite identificar a assinatura de cada vistoria sem migration
+            var nomeArquivo = $"assinatura_vistoria_{vistoriaId}.png";
+
+            var ms = new MemoryStream();
+            await arquivo.CopyToAsync(ms);
+            ms.Position = 0;
+
+            string caminho;
+            try
+            {
+                await _storageService.CriarEstruturaPastasAsync(ocorrencia.Protocolo);
+                caminho = await _storageService.SalvarArquivoAsync(
+                    ocorrencia.Protocolo, nomeArquivo, TipoArquivo.ASSINATURA_MUNICIPIO, ms);
+            }
+            finally
+            {
+                await ms.DisposeAsync();
+            }
+
+            // Remove assinatura anterior desta vistoria se existir
+            var anterior = await _context.Arquivos
+                .FirstOrDefaultAsync(a =>
+                    a.OcorrenciaId == ocorrenciaId &&
+                    a.TipoArquivo  == TipoArquivo.ASSINATURA_MUNICIPIO.ToString() &&
+                    a.NomeOriginal == nomeArquivo);
+
+            if (anterior != null)
+                _context.Arquivos.Remove(anterior);
+
+            _context.Arquivos.Add(new Arquivo
+            {
+                OcorrenciaId     = ocorrenciaId,
+                NomeOriginal     = nomeArquivo,
+                TipoArquivo      = TipoArquivo.ASSINATURA_MUNICIPIO.ToString(),
+                CaminhoRelativo  = caminho,
+                TamanhoBytes     = arquivo.Length,
+                EnviadoPorUserId = usuarioId,
+                EnviadoEm        = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Assinatura salva para vistoria {VistoriaId} da ocorrência {Protocolo} por usuário {UsuarioId}",
+                vistoriaId, ocorrencia.Protocolo, usuarioId);
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -588,6 +689,10 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     AtualizadoEm = o.AvaliacaoRisco.AtualizadoEm
                 },
 
+                GrauRiscoEfetivo = o.Vistorias.Any()
+                    ? o.Vistorias.OrderByDescending(v => v.Numero).First().GrauRiscoEncontrado
+                    : o.AvaliacaoRisco?.GrauRiscoInicial,
+
                 Agendamentos = o.Agendamentos
                     .OrderBy(a => a.Numero)
                     .Select(a => new AgendamentoVistoriaDto
@@ -647,6 +752,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         Interdicao = v.Interdicao,
                         Remocao = v.Remocao,
                         Orientacoes = v.Orientacoes,
+                        Observacoes = v.Observacoes,
                         EncaminhamentosDeCampo = v.EncaminhamentosDeCampo,
                         RegistradoPor = v.RegistradoPor.Nome,
                         RegistradoEm = v.RegistradoEm
@@ -682,15 +788,17 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     AtualizadoEm = o.EncaminhamentoFinal.AtualizadoEm
                 },
 
-                Arquivos = o.Arquivos.Select(a => new DocumentoVisualizacao
-                {
-                    NomeOriginal = a.NomeOriginal,
-                    TipoArquivo = Enum.Parse<TipoArquivo>(a.TipoArquivo),
-                    CaminhoRelativo = a.CaminhoRelativo,
-                    TamanhoBytes = a.TamanhoBytes,
-                    EnviadoPorUserId = a.EnviadoPorUserId,
-                    EnviadoEm = a.EnviadoEm
-                }).ToList(),
+                Arquivos = o.Arquivos
+                    .Where(a => Enum.TryParse<TipoArquivo>(a.TipoArquivo, out _))
+                    .Select(a => new DocumentoVisualizacao
+                    {
+                        NomeOriginal    = a.NomeOriginal,
+                        TipoArquivo     = Enum.Parse<TipoArquivo>(a.TipoArquivo),
+                        CaminhoRelativo = a.CaminhoRelativo,
+                        TamanhoBytes    = a.TamanhoBytes,
+                        EnviadoPorUserId = a.EnviadoPorUserId,
+                        EnviadoEm       = a.EnviadoEm
+                    }).ToList(),
 
                 CriadoPor = o.CriadoPor.Nome,
                 AbertaEm = o.AbertaEm,

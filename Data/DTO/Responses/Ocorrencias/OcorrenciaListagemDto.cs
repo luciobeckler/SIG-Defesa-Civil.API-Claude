@@ -24,6 +24,13 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public TipificacaoOcorrencia? TipificacaoInicial { get; set; }
         public bool? Emergencia { get; set; }
 
+        // ── Risco efetivo ─────────────────────────────────────────────────────────
+        /// <summary>
+        /// GrauRiscoEncontrado da última vistoria quando existe vistoria realizada;
+        /// caso contrário, GrauRiscoInicial da avaliação de risco. Null se nenhuma etapa concluída.
+        /// </summary>
+        public GrauRisco? GrauRiscoEfetivo { get; set; }
+
         // ── Etapa 3 (resumo) ──────────────────────────────────────────────────────
         public string? NomeVistoriador1 { get; set; }
 

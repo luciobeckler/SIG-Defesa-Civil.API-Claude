@@ -9,7 +9,13 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
     /// </summary>
     public class RegistrarEncaminhamentoRequest
     {
-        public string? Encaminhamentos { get; set; }
+        /// <summary>Órgãos/ações para onde a ocorrência foi encaminhada — multi-select.</summary>
+        public List<Encaminhamento> Encaminhamentos { get; set; } = new();
+
+        /// <summary>
+        /// Retorno dos encaminhamentos. NÃO é coletado no registro inicial da Etapa 6.
+        /// Preenchido em endpoint separado, quando o encaminhamento é dado como concluído.
+        /// </summary>
         public string? RetornoEncaminhamentos { get; set; }
 
         /// <summary>

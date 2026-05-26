@@ -34,6 +34,13 @@ namespace SIG_Defesa_Civil.API.Services.Encaminhamento
             int usuarioId);
 
         /// <summary>
+        /// Registra ou atualiza o retorno/conclusão de um encaminhamento.
+        /// Pode ser chamado a qualquer momento após o encaminhamento final existir,
+        /// inclusive com a ocorrência já ENCERRADA. Não altera o status.
+        /// </summary>
+        Task<EncaminhamentoFinalDto> RegistrarRetornoAsync(int ocorrenciaId, string retorno, int usuarioId);
+
+        /// <summary>
         /// Reabre uma ocorrência encerrada — retorna o status para NOTIFICADA.
         /// Use quando for necessário corrigir o encaminhamento.
         /// </summary>

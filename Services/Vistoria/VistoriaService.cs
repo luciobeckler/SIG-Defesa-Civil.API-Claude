@@ -173,6 +173,22 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             return MapearAgendamentoDto(agendamento);
         }
 
+        public async Task ExcluirAgendamentoAsync(int ocorrenciaId, int agendamentoId, int usuarioId)
+        {
+            var agendamento = await _context.AgendamentosVistoria
+                .Include(a => a.Tentativas)
+                .FirstOrDefaultAsync(a => a.Id == agendamentoId && a.OcorrenciaId == ocorrenciaId)
+                ?? throw new InvalidOperationException(
+                    $"Agendamento {agendamentoId} não encontrado para a ocorrência {ocorrenciaId}.");
+
+            _context.AgendamentosVistoria.Remove(agendamento);
+            await _context.SaveChangesAsync();
+
+            _logger.LogWarning(
+                "Agendamento {AgendamentoId} removido da ocorrência {OcorrenciaId} pelo usuário {UsuarioId}",
+                agendamentoId, ocorrenciaId, usuarioId);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════════
         // ETAPA 4 — VISTORIA PRESENCIAL
         // ═══════════════════════════════════════════════════════════════════════════
@@ -246,6 +262,7 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
                 Interdicao = request.Interdicao,
                 Remocao = request.Remocao,
                 Orientacoes = request.Orientacoes,
+                Observacoes = request.Observacoes,
                 EncaminhamentosDeCampo = request.EncaminhamentosDeCampo,
                 RegistradoPorId = usuarioId,
                 RegistradoEm = DateTime.UtcNow,
@@ -337,6 +354,7 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             vistoria.Interdicao = request.Interdicao;
             vistoria.Remocao = request.Remocao;
             vistoria.Orientacoes = request.Orientacoes;
+            vistoria.Observacoes = request.Observacoes;
             vistoria.EncaminhamentosDeCampo = request.EncaminhamentosDeCampo;
             vistoria.AtualizadoEm = DateTime.UtcNow;
 
@@ -495,6 +513,7 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             Interdicao = v.Interdicao,
             Remocao = v.Remocao,
             Orientacoes = v.Orientacoes,
+            Observacoes = v.Observacoes,
             EncaminhamentosDeCampo = v.EncaminhamentosDeCampo,
             RegistradoPor = v.RegistradoPor.Nome,
             RegistradoEm = v.RegistradoEm

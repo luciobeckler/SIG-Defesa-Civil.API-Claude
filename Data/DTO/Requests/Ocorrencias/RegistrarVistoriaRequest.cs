@@ -22,7 +22,7 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
 
         // ── Caracterização do local ──────────────────────────────────────────────
         public string? DescricaoDoLocal { get; set; }
-        public string? CaracterizacaoDoLocal { get; set; }
+        public CaracterizacaoLocal? CaracterizacaoDoLocal { get; set; }
 
         [Required] public TipoEdificacao Edificacao { get; set; }
         [Required] public TipoEstrutura Estrutura { get; set; }
@@ -49,15 +49,31 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
         // ── Classificação de risco ───────────────────────────────────────────────
         [Required] public TipoRiscoVistoria TipoRisco { get; set; }
         [Required] public GrauRisco GrauRiscoEncontrado { get; set; }
-        [Required] public TipificacaoOcorrencia TipificacaoOcorrencia { get; set; }
+
+        /// <summary>Tipificações identificadas em campo — multi-select (mínimo 1).</summary>
+        [Required, MinLength(1, ErrorMessage = "Informe ao menos uma tipificação.")]
+        public List<TipificacaoOcorrencia> TipificacaoOcorrencia { get; set; } = new();
+
         [Required] public RegimeOcupacaoImovel RegimeOcupacao { get; set; }
 
         // ── Conclusões ───────────────────────────────────────────────────────────
-        public string? Motivacao { get; set; }
-        [Required] public AreaAfetada AreasAfetadas { get; set; }
+        /// <summary>Causas/motivações — multi-select.</summary>
+        public List<Motivacao> Motivacao { get; set; } = new();
+
+        /// <summary>Áreas afetadas — multi-select (mínimo 1).</summary>
+        [Required, MinLength(1, ErrorMessage = "Informe ao menos uma área afetada.")]
+        public List<AreaAfetada> AreasAfetadas { get; set; } = new();
+
         [Required] public TipoInterdicao Interdicao { get; set; }
         [Required] public TipoRemocao Remocao { get; set; }
-        public string? Orientacoes { get; set; }
-        public string? EncaminhamentosDeCampo { get; set; }
+
+        /// <summary>Orientações ao morador — multi-select.</summary>
+        public List<Orientacao> Orientacoes { get; set; } = new();
+
+        /// <summary>Observações livres registradas em campo.</summary>
+        public string? Observacoes { get; set; }
+
+        /// <summary>Encaminhamentos imediatos registrados em campo — multi-select.</summary>
+        public List<Encaminhamento> EncaminhamentosDeCampo { get; set; } = new();
     }
 }

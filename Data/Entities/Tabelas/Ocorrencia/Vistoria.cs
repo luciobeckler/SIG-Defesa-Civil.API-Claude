@@ -33,7 +33,10 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
 
         // ── Caracterização do local ──────────────────────────────────────────────
         public string? DescricaoDoLocal { get; set; }
-        public string? CaracterizacaoDoLocal { get; set; }
+
+        /// <summary>Geomorfologia do terreno — substituiu campo de texto livre.</summary>
+        public CaracterizacaoLocal? CaracterizacaoDoLocal { get; set; }
+
         public TipoEdificacao Edificacao { get; set; }
         public TipoEstrutura Estrutura { get; set; }
 
@@ -59,18 +62,33 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         // ── Classificação de risco ───────────────────────────────────────────────
         public TipoRiscoVistoria TipoRisco { get; set; }
         public GrauRisco GrauRiscoEncontrado { get; set; }
-        public TipificacaoOcorrencia TipificacaoOcorrencia { get; set; }
+
+        /// <summary>Multi-select: tipificações identificadas na vistoria (integer[]).</summary>
+        public List<TipificacaoOcorrencia> TipificacaoOcorrencia { get; set; } = new();
+
         public RegimeOcupacaoImovel RegimeOcupacao { get; set; }
 
         // ── Conclusões ───────────────────────────────────────────────────────────
-        public string? Motivacao { get; set; }
-        public AreaAfetada AreasAfetadas { get; set; }
+        /// <summary>Causas identificadas — multi-select (integer[]).</summary>
+        public List<Motivacao> Motivacao { get; set; } = new();
+
+        /// <summary>Áreas do imóvel/entorno afetadas — multi-select (integer[]).</summary>
+        public List<AreaAfetada> AreasAfetadas { get; set; } = new();
+
         public TipoInterdicao Interdicao { get; set; }
         public TipoRemocao Remocao { get; set; }
-        public string? Orientacoes { get; set; }
 
-        /// <summary>Encaminhamentos imediatos registrados em campo (diferente dos encaminhamentos formais da Etapa 6).</summary>
-        public string? EncaminhamentosDeCampo { get; set; }
+        /// <summary>Orientações ao morador — multi-select (integer[]).</summary>
+        public List<Orientacao> Orientacoes { get; set; } = new();
+
+        /// <summary>Observações livres registradas em campo.</summary>
+        public string? Observacoes { get; set; }
+
+        /// <summary>
+        /// Encaminhamentos imediatos registrados em campo — multi-select (integer[]).
+        /// Compartilha o enum <see cref="Encaminhamento"/> com o EncaminhamentoFinal.
+        /// </summary>
+        public List<Encaminhamento> EncaminhamentosDeCampo { get; set; } = new();
 
         // ── Auditoria ────────────────────────────────────────────────────────────
         public int RegistradoPorId { get; set; }

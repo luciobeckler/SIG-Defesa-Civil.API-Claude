@@ -111,6 +111,28 @@ namespace SIG_Defesa_Civil.API.Services.Encaminhamento
             return MapearDto(encaminhamento);
         }
 
+        public async Task<EncaminhamentoFinalDto> RegistrarRetornoAsync(
+            int ocorrenciaId, string retorno, int usuarioId)
+        {
+            var encaminhamento = await _context.EncaminhamentosFinais
+                .Include(e => e.RegistradoPor)
+                .Include(e => e.RelatorioVistoria)
+                .FirstOrDefaultAsync(e => e.OcorrenciaId == ocorrenciaId)
+                ?? throw new InvalidOperationException(
+                    $"Nenhum encaminhamento encontrado para a ocorrência {ocorrenciaId}.");
+
+            encaminhamento.RetornoEncaminhamentos = retorno;
+            encaminhamento.AtualizadoEm = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Retorno do encaminhamento registrado. Ocorrência ID {OcorrenciaId} pelo usuário {UsuarioId}",
+                ocorrenciaId, usuarioId);
+
+            return MapearDto(encaminhamento);
+        }
+
         public async Task ReabrirAsync(int ocorrenciaId, int usuarioId, string motivo)
         {
             var ocorrencia = await _context.Ocorrencias

@@ -1,4 +1,5 @@
-﻿using SIG_Defesa_Civil.API.Data.DTO.Requests;
+﻿using Microsoft.AspNetCore.Http;
+using SIG_Defesa_Civil.API.Data.DTO.Requests;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Arquivos;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Arquivos;
@@ -83,5 +84,22 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         /// Continua o processamento mesmo se uma geração individual falhar.
         /// </summary>
         Task<GeracaoLoteResultadoDto> GerarDocumentosEmLoteAsync(GerarDocumentosLoteRequest request);
+
+        /// <summary>
+        /// Consulta pública para o cidadão acompanhar sua ocorrência via protocolo + CPF.
+        /// Retorna dados mascarados (LGPD). Não requer autenticação.
+        /// Lança <see cref="UnauthorizedAccessException"/> se o CPF não corresponder ao solicitante.
+        /// Lança <see cref="InvalidOperationException"/> se o protocolo não existir.
+        /// </summary>
+        Task<OcorrenciaDetalheDto> AcompanharAsync(string protocolo, string cpf);
+
+        // ── Assinatura do Munícipe ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Salva a assinatura digital do munícipe (PNG do canvas) vinculada a uma vistoria específica.
+        /// Tipo de arquivo: ASSINATURA_MUNICIPIO. Substitui assinatura anterior da mesma vistoria se existir.
+        /// Lança <see cref="InvalidOperationException"/> se a vistoria não pertencer à ocorrência.
+        /// </summary>
+        Task SalvarAssinaturaAsync(int ocorrenciaId, int vistoriaId, IFormFile arquivo, int usuarioId);
     }
 }

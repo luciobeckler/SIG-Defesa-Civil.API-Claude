@@ -20,7 +20,15 @@
       "Bash(popd)",
       "Bash(npm install *)",
       "Bash(node_modules/.bin/ng build *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lucio\\\\Desktop\\\\TCC\\\\Sistema - Defesa Civil\\\\sig-defesa-civil-frontend\\\\src\\\\app\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(Select-String -pattern \"acompanhar|solicitacao|tracking\")",
+      "Bash(powershell -Command \"Get-Item 'sig-defesa-civil-frontend\\\\src\\\\app\\\\features\\\\ocorrencias\\\\detalhe\\\\detalhe.page.ts' -ErrorAction Stop | Select-Object -ExpandProperty FullName\")",
+      "Bash(powershell -Command \"Get-Item 'sig-defesa-civil-frontend\\\\src\\\\app\\\\features\\\\ocorrencias\\\\nova\\\\nova.page.ts' -ErrorAction Stop | Select-Object -ExpandProperty FullName\")",
+      "Bash(mkdir \"C:\\\\Users\\\\lucio\\\\Desktop\\\\TCC\\\\Sistema - Defesa Civil\\\\sig-defesa-civil-frontend\\\\src\\\\app\\\\shared\\\\components\\\\assinatura-modal\")",
+      "Bash(npx --prefix \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend\" tsc --noEmit --project \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend/tsconfig.json\")"
     ]
   }
 }

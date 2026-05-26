@@ -27,6 +27,14 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         /// <summary>Null enquanto a Etapa 2 não for preenchida.</summary>
         public AvaliacaoRiscoDto? AvaliacaoRisco { get; set; }
 
+        /// <summary>
+        /// Grau de risco efetivo para exibição na interface e relatórios.
+        /// Regra: se houver ao menos uma vistoria presencial realizada, retorna o
+        /// GrauRiscoEncontrado da vistoria de maior número; caso contrário, retorna
+        /// o GrauRiscoInicial da avaliação de risco. Null se nenhuma etapa foi concluída.
+        /// </summary>
+        public GrauRisco? GrauRiscoEfetivo { get; set; }
+
         // ── Etapa 3: Agendamentos de Vistoria ─────────────────────────────────────
         /// <summary>Todos os agendamentos desta ocorrência, em ordem crescente de Numero. Lista vazia antes da Etapa 3.</summary>
         public List<AgendamentoVistoriaDto> Agendamentos { get; set; } = new();

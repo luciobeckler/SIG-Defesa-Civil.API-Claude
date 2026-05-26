@@ -12,8 +12,8 @@ using SIG_Defesa_Civil.API.Data.Models;
 namespace SIG_Defesa_Civil.API.Migrations
 {
     [DbContext(typeof(DefesaCivilContext))]
-    [Migration("20260505165752_adicionando dateonly")]
-    partial class adicionandodateonly
+    [Migration("20260513023349_Alteracao na ficha de vistoria")]
+    partial class Alteracaonafichadevistoria
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -86,8 +86,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<DateTime>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Encaminhamentos")
-                        .HasColumnType("text");
+                    b.Property<int[]>("Encaminhamentos")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
 
                     b.Property<string>("EntregaRelatorio")
                         .IsRequired()
@@ -283,15 +284,18 @@ namespace SIG_Defesa_Civil.API.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AreasAfetadas")
+                    b.Property<int?>("AgendamentoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int[]>("AreasAfetadas")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("integer[]");
 
                     b.Property<DateTime>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CaracterizacaoDoLocal")
-                        .HasColumnType("text");
+                    b.Property<int?>("CaracterizacaoDoLocal")
+                        .HasColumnType("integer");
 
                     b.Property<DateOnly>("DataVistoria")
                         .HasColumnType("date");
@@ -303,8 +307,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("EncaminhamentosDeCampo")
-                        .HasColumnType("text");
+                    b.Property<int[]>("EncaminhamentosDeCampo")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
 
                     b.Property<string>("Estrutura")
                         .IsRequired()
@@ -324,8 +329,12 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Motivacao")
-                        .HasColumnType("text");
+                    b.Property<int[]>("Motivacao")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer");
 
                     b.Property<int>("NumeroAdultos")
                         .HasColumnType("integer");
@@ -351,11 +360,15 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<int>("NumeroPavimentos")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Observacoes")
+                        .HasColumnType("text");
+
                     b.Property<int>("OcorrenciaId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Orientacoes")
-                        .HasColumnType("text");
+                    b.Property<int[]>("Orientacoes")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
 
                     b.Property<bool>("PossuiUnidadeFamiliar")
                         .HasColumnType("boolean");
@@ -374,9 +387,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("TipificacaoOcorrencia")
+                    b.Property<int[]>("TipificacaoOcorrencia")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("integer[]");
 
                     b.Property<string>("TipoRisco")
                         .IsRequired()
@@ -387,14 +400,16 @@ namespace SIG_Defesa_Civil.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AgendamentoId");
+
                     b.HasIndex("DataVistoria");
 
                     b.HasIndex("GrauRiscoEncontrado");
 
-                    b.HasIndex("OcorrenciaId")
-                        .IsUnique();
-
                     b.HasIndex("RegistradoPorId");
+
+                    b.HasIndex("OcorrenciaId", "Numero")
+                        .IsUnique();
 
                     b.ToTable("vistorias");
                 });
@@ -413,8 +428,15 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<int>("AgendadoPorId")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer");
+
                     b.Property<int>("OcorrenciaId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("Vistoriador1Id")
                         .HasColumnType("integer");
@@ -426,12 +448,12 @@ namespace SIG_Defesa_Civil.API.Migrations
 
                     b.HasIndex("AgendadoPorId");
 
-                    b.HasIndex("OcorrenciaId")
-                        .IsUnique();
-
                     b.HasIndex("Vistoriador1Id");
 
                     b.HasIndex("Vistoriador2Id");
+
+                    b.HasIndex("OcorrenciaId", "Numero")
+                        .IsUnique();
 
                     b.ToTable("agendamentos_vistoria");
                 });
@@ -769,9 +791,14 @@ namespace SIG_Defesa_Civil.API.Migrations
 
             modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Vistoria", b =>
                 {
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", "Agendamento")
+                        .WithMany()
+                        .HasForeignKey("AgendamentoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
-                        .WithOne("Vistoria")
-                        .HasForeignKey("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Vistoria", "OcorrenciaId")
+                        .WithMany("Vistorias")
+                        .HasForeignKey("OcorrenciaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -780,6 +807,8 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .HasForeignKey("RegistradoPorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Agendamento");
 
                     b.Navigation("Ocorrencia");
 
@@ -795,8 +824,8 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired();
 
                     b.HasOne("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", "Ocorrencia")
-                        .WithOne("AgendamentoVistoria")
-                        .HasForeignKey("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", "OcorrenciaId")
+                        .WithMany("Agendamentos")
+                        .HasForeignKey("OcorrenciaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -875,7 +904,7 @@ namespace SIG_Defesa_Civil.API.Migrations
 
             modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.Ocorrencia", b =>
                 {
-                    b.Navigation("AgendamentoVistoria");
+                    b.Navigation("Agendamentos");
 
                     b.Navigation("Arquivos");
 
@@ -889,7 +918,7 @@ namespace SIG_Defesa_Civil.API.Migrations
 
                     b.Navigation("Observacoes");
 
-                    b.Navigation("Vistoria");
+                    b.Navigation("Vistorias");
                 });
 
             modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", b =>

@@ -8,6 +8,7 @@ using SIG_Defesa_Civil.API.Enums;
 using SIG_Defesa_Civil.API.Exceptions;
 using SIG_Defesa_Civil.API.Services;
 using SIG_Defesa_Civil.API.Services.Ocorrencia;
+using SIG_Defesa_Civil.API.Services.Relatorio;
 using SIG_Defesa_Civil.API.Services.Storage;
 using System.Text.Json;
 
@@ -20,15 +21,18 @@ namespace SIG_Defesa_Civil.API.Controllers
     {
         private readonly IOcorrenciaService _ocorrenciaService;
         private readonly IStorageService _storageService;
+        private readonly IRelatorioService _relatorioService;
         private readonly ILogger<OcorrenciaController> _logger;
 
         public OcorrenciaController(
             IOcorrenciaService ocorrenciaService,
             IStorageService storageService,
+            IRelatorioService relatorioService,
             ILogger<OcorrenciaController> logger)
         {
             _ocorrenciaService = ocorrenciaService;
             _storageService = storageService;
+            _relatorioService = relatorioService;
             _logger = logger;
         }
 
@@ -61,6 +65,7 @@ namespace SIG_Defesa_Civil.API.Controllers
             var ipOrigem = ObterIpCliente();
             // Endpoint público — cidadãos não têm conta no sistema.
             // O ID do criador é resolvido internamente pelo serviço a partir do CPF informado.
+
 
             _logger.LogInformation(
                 "Recebida requisição de criação de ocorrência. IP: {IP}, Fotos: {Count}",
@@ -148,6 +153,53 @@ namespace SIG_Defesa_Civil.API.Controllers
             catch (Exception ex)
             {
                 return ErroInterno(ex, _logger, "CriarOcorrencia");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // GET /api/v1/ocorrencias/acompanhar — Consulta pública cidadão
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Consulta pública: cidadão acompanha sua ocorrência via protocolo + CPF.
+        /// Retorna dados mascarados (LGPD). Não requer autenticação.
+        /// </summary>
+        /// <param name="protocolo">Número do protocolo (ex: 2026-0001)</param>
+        /// <param name="cpf">CPF do solicitante (somente dígitos ou formatado)</param>
+        /// <response code="200">Detalhe mascarado da ocorrência</response>
+        /// <response code="400">Protocolo ou CPF não informados</response>
+        /// <response code="403">CPF não corresponde ao solicitante</response>
+        /// <response code="404">Protocolo não encontrado</response>
+        [HttpGet("acompanhar")]
+        [ProducesResponseType(typeof(ApiResponse<OcorrenciaDetalheDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AcompanharSolicitacao(
+            [FromQuery] string protocolo,
+            [FromQuery] string cpf)
+        {
+            if (string.IsNullOrWhiteSpace(protocolo) || string.IsNullOrWhiteSpace(cpf))
+                return BadRequest(ApiResponse<object>.Error(
+                    "Protocolo e CPF são obrigatórios", ErrosRequisicoes.DADOS_AUSENTES));
+
+            try
+            {
+                var resultado = await _ocorrenciaService.AcompanharAsync(protocolo.Trim(), cpf.Trim());
+                return Ok(ApiResponse<OcorrenciaDetalheDto>.Success(resultado));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    ApiResponse<object>.Error(ex.Message, ErrosRequisicoes.ACESSO_NEGADO));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"AcompanharSolicitacao(protocolo={protocolo})");
             }
         }
 
@@ -463,6 +515,154 @@ namespace SIG_Defesa_Civil.API.Controllers
             catch (Exception ex)
             {
                 return ErroInterno(ex, _logger, $"ListarArquivos({id}, {tipoArquivo})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // POST /api/v1/ocorrencias/{id}/assinatura/{vistoriaId} — Assinatura do Munícipe
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Salva a assinatura digital do munícipe coletada via canvas no app.
+        /// Substitui assinatura anterior caso já exista.
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="vistoriaId">ID da vistoria à qual a assinatura pertence</param>
+        /// <param name="arquivos">Imagem PNG da assinatura (max 2 MB)</param>
+        /// <response code="201">Assinatura salva com sucesso</response>
+        /// <response code="400">Arquivo ausente ou muito grande</response>
+        /// <response code="404">Ocorrência ou vistoria não encontrada</response>
+        /// <response code="503">Falha no armazenamento</response>
+        [HttpPost("{id:int}/assinatura/{vistoriaId:int}")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> SalvarAssinatura(
+            [FromRoute] int id,
+            [FromRoute] int vistoriaId,
+            [FromForm] List<IFormFile>? arquivos)
+        {
+            var arquivo = arquivos?.FirstOrDefault();
+
+            try
+            {
+                if (arquivo == null || arquivo.Length == 0)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "Nenhuma assinatura enviada.",
+                        ErrosRequisicoes.ARQUIVOS_AUSENTES));
+
+                const long maxSize = 2 * 1024 * 1024; // 2 MB
+                if (arquivo.Length > maxSize)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "Arquivo de assinatura excede o tamanho máximo de 2 MB.",
+                        ErrosRequisicoes.ARQUIVO_MUITO_GRANDE));
+
+                await _ocorrenciaService.SalvarAssinaturaAsync(id, vistoriaId, arquivo, ObterUsuarioIdInterno());
+
+                return StatusCode(
+                    StatusCodes.Status201Created,
+                    ApiResponse<object>.Success(null, "Assinatura do munícipe salva com sucesso."));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrada"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (StorageException ex)
+            {
+                _logger.LogError(ex, "Falha ao salvar assinatura para ocorrência {Id}", id);
+                return StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
+                    ApiResponse<object>.Error(
+                        "Sistema temporariamente indisponível. Tente novamente em alguns minutos.",
+                        ErrosRequisicoes.UPLOAD_FAILED));
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"SalvarAssinatura({id})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // RELATÓRIO FINAL — POST + DELETE /api/v1/ocorrencias/{id}/relatorio
+        // Uma ocorrência → um relatório final. Pode ser excluído e regerado.
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Gera o relatório final da ocorrência preenchendo o template .docx com os dados
+        /// da vistoria selecionada. Se já existir um relatório, ele é substituído.
+        /// O arquivo gerado fica em [Protocolo]/Documentos/relatorio_final_{id}.docx.
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="request">ID da vistoria a ser usada para o preenchimento</param>
+        /// <response code="201">Relatório gerado com sucesso</response>
+        /// <response code="404">Ocorrência ou vistoria não encontrada</response>
+        /// <response code="422">Dados insuficientes para gerar o relatório</response>
+        /// <response code="503">Falha ao gerar ou salvar o arquivo</response>
+        // POST /api/v1/ocorrencias/{id}/relatorio
+        [HttpPost("{id:int}/relatorio")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> GerarRelatorio(
+            [FromRoute] int id,
+            [FromBody] GerarRelatorioRequest request)
+        {
+            try
+            {
+                await _relatorioService.GerarRelatorioAsync(
+                    id, request.VistoriaId, ObterUsuarioIdInterno());
+
+                return StatusCode(
+                    StatusCodes.Status201Created,
+                    ApiResponse<object>.Success(null, "Relatório final gerado com sucesso."));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrada"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Falha ao gerar relatório final para ocorrência {Id}", id);
+                return StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
+                    ApiResponse<object>.Error(
+                        "Erro ao gerar o relatório. Verifique o template e tente novamente.",
+                        ErrosRequisicoes.ERRO_INTERNO));
+            }
+        }
+
+        /// <summary>
+        /// Remove o registro do relatório final da ocorrência, permitindo que um novo seja gerado.
+        /// O arquivo físico permanece no storage como backup.
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <response code="204">Relatório removido</response>
+        /// <response code="404">Nenhum relatório encontrado para esta ocorrência</response>
+        // DELETE /api/v1/ocorrencias/{id}/relatorio
+        [HttpDelete("{id:int}/relatorio")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ExcluirRelatorio([FromRoute] int id)
+        {
+            try
+            {
+                await _relatorioService.ExcluirRelatorioAsync(id);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrado"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"ExcluirRelatorio({id})");
             }
         }
 

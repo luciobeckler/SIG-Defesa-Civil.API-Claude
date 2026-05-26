@@ -4,7 +4,7 @@
     public enum TipoUsuario { CIDADAO, ATENDENTE, VISTORIADOR, ADMIN }
 
     // ─── Arquivos ────────────────────────────────────────────────────────────────
-    public enum TipoArquivo { FOTO_CIDADAO, COMPROVANTE_RESIDENCIA, FICHA_VISTORIA, FOTO_CAMPO, RELATORIO_FINAL }
+    public enum TipoArquivo { FOTO_CIDADAO, COMPROVANTE_RESIDENCIA, FICHA_VISTORIA, FOTO_CAMPO, RELATORIO_FINAL, ASSINATURA_MUNICIPIO }
 
     // ─── LGPD ────────────────────────────────────────────────────────────────────
     public enum AcaoLgpd { VISUALIZOU, BAIXOU, EDITOU, EXCLUIU, CRIOU }
@@ -42,17 +42,24 @@
     // ─── Etapa 2 — Avaliação de Risco ────────────────────────────────────────────
     public enum TipificacaoOcorrencia
     {
-        DESLIZAMENTO,
-        RISCO_ESTRUTURAL,
-        ENCHENTE,
+        ABATIMENTO_DE_FOSSA,
+        ALAGAMENTO,
+        ARVORE_COM_RISCO_DE_QUEDA,
+        CICATRIZ_DE_ESCORREGAMENTO,
+        DEGRAU_DE_ABATIMENTO,
         EROSAO,
-        DESABAMENTO,
-        ALAGAMENTO
+        ESCORREGAMENTO,
+        INCENDIO,
+        INUNDACAO_DE_CORREGO_RIO,
+        QUEDA_DE_ARVORES,
+        REDE_PUBLICA_DE_DRENAGEM_PLUVIAL_ROMPIDA,
+        ROLAMENTO_TOMBAMENTO_DE_BLOCOS,
+        SOLAPAMENTO,
+        TRINCAS
     }
 
     public enum GrauRisco
     {
-        SEM_RISCO,
         BAIXO,
         MEDIO,
         ALTO,
@@ -72,28 +79,43 @@
     }
 
     // ─── Etapa 4 — Vistoria Presencial ───────────────────────────────────────────
+
+    /// <summary>Caracterização geomorfológica do local vistoriado.</summary>
+    public enum CaracterizacaoLocal
+    {
+        DE_CORTE,
+        ENCOSTA_MORRO,
+        MARGEM_CORREGO_RIO,
+        RURAL,
+        URBANA
+    }
+
     public enum TipoEdificacao
     {
-        RESIDENCIAL,
-        COMERCIAL,
-        MISTO,
-        PUBLICO
+        BARRACAO,
+        CASA,
+        COMERCIO,
+        GALPAO,
+        PREDIO
     }
 
     public enum TipoEstrutura
     {
         ALVENARIA,
+        CONCRETO_ARMADO,
         MADEIRA,
-        MISTA,
-        CONCRETO
+        OUTROS_MATERIAIS,
+        PRE_FABRICADO
     }
 
     public enum TipoRiscoVistoria
     {
+        BIOLOGICO,
+        CONSTRUTIVO,
         GEOLOGICO,
         HIDROLOGICO,
-        ESTRUTURAL,
-        TECNOLOGICO
+        TECNOLOGICO,
+        OUTROS
     }
 
     public enum RegimeOcupacaoImovel
@@ -101,31 +123,81 @@
         PROPRIO,
         ALUGADO,
         CEDIDO,
-        IRREGULAR
+        IRREGULAR,
+        OUTROS
     }
 
+    /// <summary>Áreas do imóvel/entorno afetadas — multi-select.</summary>
     public enum AreaAfetada
     {
-        ESTRUTURA,
-        TELHADO,
-        FUNDACAO,
+        COMERCIO,
+        GALPAO,
         MURO,
-        PISO,
-        AREA_EXTERNA
+        OUTROS,
+        PONTE,
+        PREDIO_PUBLICO,
+        RESIDENCIA,
+        VIA_PUBLICA
     }
 
     public enum TipoInterdicao
     {
-        NAO_INTERDITADO,
-        INTERDITADO_PARCIAL,
-        INTERDITADO_TOTAL
+        NAO_NECESSARIA,
+        PARCIAL,
+        TOTAL
     }
 
     public enum TipoRemocao
     {
-        NAO_REMOVIDA,
-        REMOVIDA_TEMPORARIA,
-        REMOVIDA_DEFINITIVA
+        NAO_NECESSARIA,
+        TEMPORARIA,
+        DEFINITIVA
+    }
+
+    /// <summary>Causas/motivações identificadas na vistoria — multi-select.</summary>
+    public enum Motivacao
+    {
+        DESABAMENTO_PARCIAL,
+        DESABAMENTO_TOTAL,
+        DESPRENDIMENTO_DE_REBOCO,
+        ENCOSTA,
+        INFILTRACAO,
+        LANCAMENTO_AGUA_PLUVIAL_ESGOTO,
+        LANCAMENTO_LIXO_ENTULHO_ATERRO,
+        MOVIMENTACAO_DE_SOLO,
+        PRECARIO_INSALUBRE,
+        RACHADURAS
+    }
+
+    /// <summary>Orientações dadas ao morador — multi-select.</summary>
+    public enum Orientacao
+    {
+        CONTRATACAO_PROFISSIONAL_HABILITADO,
+        DESOCUPACAO,
+        NAO_EXPANDIR_EDIFICACAO,
+        NAO_PERMANECER_EM_CASO_DE_CHUVA,
+        NAO_PERMANECER_NO_LOCAL_ENQUANTO_HOUVER_RISCO,
+        PROCURAR_ABRIGO,
+        REALIZAR_CAPTACAO_AGUAS_PLUVIAIS,
+        REMOCAO_DO_ENTULHO,
+        SOLICITAR_NOVA_VISTORIA
+    }
+
+    /// <summary>
+    /// Encaminhamentos institucionais — multi-select compartilhado entre
+    /// Vistoria (campo) e EncaminhamentoFinal (Etapa 6).
+    /// </summary>
+    public enum Encaminhamento
+    {
+        AJUDA_HUMANITARIA,
+        CEMIG,
+        COPASA,
+        DNIT,
+        OUTROS,
+        PROVIDENCIAS_PELO_MORADOR,
+        SEC_DESENV_SOCIAL,
+        SEC_MEIO_AMBIENTE,
+        SEC_OBRAS
     }
 
     // ─── Etapa 6 — Encaminhamento Final ──────────────────────────────────────────

@@ -18,7 +18,16 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         public Ocorrencia Ocorrencia { get; set; } = null!;
 
         // ── Encaminhamentos formais ──────────────────────────────────────────────
-        public string? Encaminhamentos { get; set; }
+        /// <summary>
+        /// Órgãos/ações para onde a ocorrência foi encaminhada — multi-select (integer[]).
+        /// Compartilha o enum <see cref="Encaminhamento"/> com a Vistoria.
+        /// </summary>
+        public List<Encaminhamento> Encaminhamentos { get; set; } = new();
+
+        /// <summary>
+        /// Retorno/conclusão dos encaminhamentos.
+        /// Preenchido em momento posterior, quando o encaminhamento é dado como concluído.
+        /// </summary>
         public string? RetornoEncaminhamentos { get; set; }
 
         // ── Relatório de vistoria ────────────────────────────────────────────────

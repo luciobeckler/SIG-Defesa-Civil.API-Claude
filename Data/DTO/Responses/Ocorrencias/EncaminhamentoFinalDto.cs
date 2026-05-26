@@ -7,7 +7,12 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
     public class EncaminhamentoFinalDto
     {
         public int Id { get; set; }
-        public string? Encaminhamentos { get; set; }
+        public List<Encaminhamento> Encaminhamentos { get; set; } = new();
+
+        /// <summary>
+        /// Null enquanto o encaminhamento não for dado como concluído.
+        /// Preenchido em endpoint separado.
+        /// </summary>
         public string? RetornoEncaminhamentos { get; set; }
 
         /// <summary>Metadados do relatório anexado (se houver).</summary>

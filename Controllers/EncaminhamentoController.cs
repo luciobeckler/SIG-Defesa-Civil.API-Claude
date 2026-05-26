@@ -132,6 +132,40 @@ namespace SIG_Defesa_Civil.API.Controllers
         }
 
         /// <summary>
+        /// Registra ou atualiza o retorno/conclusão de um encaminhamento.
+        /// Pode ser chamado a qualquer momento após o encaminhamento existir,
+        /// inclusive com a ocorrência já ENCERRADA. Não altera o status.
+        /// </summary>
+        /// <param name="ocorrenciaId">ID da ocorrência</param>
+        /// <param name="request">Texto do retorno</param>
+        /// <response code="200">Retorno registrado com sucesso</response>
+        /// <response code="404">Encaminhamento não encontrado para esta ocorrência</response>
+        [HttpPatch("retorno")]
+        [ProducesResponseType(typeof(ApiResponse<EncaminhamentoFinalDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> RegistrarRetorno(
+            [FromRoute] int ocorrenciaId,
+            [FromBody] RegistrarRetornoEncaminhamentoRequest request)
+        {
+            try
+            {
+                var resultado = await _encaminhamentoService.RegistrarRetornoAsync(
+                    ocorrenciaId, request.Retorno, ObterUsuarioIdInterno());
+
+                return Ok(ApiResponse<EncaminhamentoFinalDto>.Success(
+                    resultado, "Retorno do encaminhamento registrado com sucesso."));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrado"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"RegistrarRetorno(ocorrencia={ocorrenciaId})");
+            }
+        }
+
+        /// <summary>
         /// Reabre uma ocorrência encerrada, revertendo o status para NOTIFICADA.
         /// Use quando for necessário corrigir o encaminhamento ou adicionar notificados.
         /// </summary>

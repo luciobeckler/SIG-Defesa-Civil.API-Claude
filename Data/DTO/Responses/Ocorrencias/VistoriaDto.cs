@@ -18,7 +18,7 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
 
         // Caracterização
         public string? DescricaoDoLocal { get; set; }
-        public string? CaracterizacaoDoLocal { get; set; }
+        public CaracterizacaoLocal? CaracterizacaoDoLocal { get; set; }
         public TipoEdificacao Edificacao { get; set; }
         public TipoEstrutura Estrutura { get; set; }
 
@@ -39,16 +39,17 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         // Classificação de risco
         public TipoRiscoVistoria TipoRisco { get; set; }
         public GrauRisco GrauRiscoEncontrado { get; set; }
-        public TipificacaoOcorrencia TipificacaoOcorrencia { get; set; }
+        public List<TipificacaoOcorrencia> TipificacaoOcorrencia { get; set; } = new();
         public RegimeOcupacaoImovel RegimeOcupacao { get; set; }
 
         // Conclusões
-        public string? Motivacao { get; set; }
-        public AreaAfetada AreasAfetadas { get; set; }
+        public List<Motivacao> Motivacao { get; set; } = new();
+        public List<AreaAfetada> AreasAfetadas { get; set; } = new();
         public TipoInterdicao Interdicao { get; set; }
         public TipoRemocao Remocao { get; set; }
-        public string? Orientacoes { get; set; }
-        public string? EncaminhamentosDeCampo { get; set; }
+        public List<Orientacao> Orientacoes { get; set; } = new();
+        public string? Observacoes { get; set; }
+        public List<Encaminhamento> EncaminhamentosDeCampo { get; set; } = new();
 
         public string RegistradoPor { get; set; } = string.Empty;
         public DateTime RegistradoEm { get; set; }

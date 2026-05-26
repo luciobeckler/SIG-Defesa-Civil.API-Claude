@@ -121,6 +121,37 @@ namespace SIG_Defesa_Civil.API.Controllers
         }
 
         /// <summary>
+        /// Remove um agendamento criado de forma incorreta e suas tentativas.
+        /// </summary>
+        /// <param name="ocorrenciaId">ID da ocorrência</param>
+        /// <param name="agendamentoId">ID do agendamento a excluir</param>
+        /// <response code="204">Agendamento removido</response>
+        /// <response code="404">Agendamento não encontrado</response>
+        [HttpDelete("agendamentos/{agendamentoId:int}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ExcluirAgendamento(
+            [FromRoute] int ocorrenciaId,
+            [FromRoute] int agendamentoId)
+        {
+            try
+            {
+                await _vistoriaService.ExcluirAgendamentoAsync(
+                    ocorrenciaId, agendamentoId, ObterUsuarioIdInterno());
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrado"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger,
+                    $"ExcluirAgendamento(ocorrencia={ocorrenciaId}, agendamento={agendamentoId})");
+            }
+        }
+
+        /// <summary>
         /// Adiciona uma nova tentativa de comparecimento ao agendamento.
         /// Máximo de 3 tentativas por agendamento.
         /// </summary>
@@ -363,5 +394,6 @@ namespace SIG_Defesa_Civil.API.Controllers
                     $"AdicionarFotosCampo(ocorrencia={ocorrenciaId}, vistoria={vistoriaId})");
             }
         }
+
     }
 }
