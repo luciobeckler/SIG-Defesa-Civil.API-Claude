@@ -36,6 +36,7 @@ services:
       AdminSeed__Email: ${ADMIN_EMAIL}
       AdminSeed__Senha: ${ADMIN_PASSWORD}
       StorageSettings__BasePath: "/arquivos"
+      TemplateSettings__CaminhoRaiz: "/arquivos/templates"
       AllowedOrigins__0: "http://192.168.8.15"
       AllowedOrigins__1: "http://179.106.96.58:8081"
       AllowedOrigins__2: "http://localhost"
