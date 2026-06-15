@@ -643,6 +643,14 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 query = query.Where(o => o.Localizacao != null &&
                                          o.Localizacao.Bairro.Contains(filtros.Bairro));
 
+            if (!string.IsNullOrWhiteSpace(filtros.CpfInicio))
+            {
+                var prefixo = new string(filtros.CpfInicio.Where(char.IsDigit).ToArray());
+                if (prefixo.Length > 0)
+                    query = query.Where(o => o.Solicitante != null &&
+                                             o.Solicitante.Cpf.StartsWith(prefixo));
+            }
+
             return query;
         }
 

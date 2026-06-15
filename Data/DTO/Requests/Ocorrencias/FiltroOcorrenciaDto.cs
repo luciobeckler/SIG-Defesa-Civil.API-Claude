@@ -20,5 +20,6 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
         public DateTime? DataFim { get; set; }
         public string? Protocolo { get; set; }
         public string? Bairro { get; set; }
+        public string? CpfInicio { get; set; }
     }
 }

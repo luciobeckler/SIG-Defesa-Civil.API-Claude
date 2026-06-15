@@ -223,6 +223,7 @@ namespace SIG_Defesa_Civil.API.Controllers
             [FromQuery] int? vistoriadorId,
             [FromQuery] DateTime? dataInicio,
             [FromQuery] DateTime? dataFim,
+            [FromQuery] string? cpfInicio,
             [FromQuery] int pagina = 1,
             [FromQuery] int tamanhoPagina = 50)
         {
@@ -237,7 +238,8 @@ namespace SIG_Defesa_Civil.API.Controllers
                     Protocolo = protocolo,
                     VistoriadorId = vistoriadorId,
                     DataInicio = dataInicio,
-                    DataFim = dataFim
+                    DataFim = dataFim,
+                    CpfInicio = cpfInicio
                 };
 
                 var paginacao = new PaginacaoDto
