@@ -3,6 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Variáveis de ambiente com segredos — nunca commitar
+.env
+
 # User-specific files
 *.rsuser
 *.suo

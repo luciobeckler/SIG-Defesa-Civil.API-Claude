@@ -1,0 +1,62 @@
+services:
+
+  # ── Banco de dados PostgreSQL ─────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: defesacivil
+      POSTGRES_USER: defesacivil
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"   # acessível apenas internamente no servidor
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U defesacivil"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── API .NET 8 ────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__ProdConnection: "Host=db;Port=5432;Database=defesacivil;Username=defesacivil;Password=${DB_PASSWORD}"
+      JwtSettings__SecretKey: ${JWT_SECRET}
+      JwtSettings__Issuer: "SIG-Defesa-Civil-API"
+      JwtSettings__Audience: "SIG-Defesa-Civil-Frontend"
+      AdminSeed__Nome: "Administrador"
+      AdminSeed__Email: ${ADMIN_EMAIL}
+      AdminSeed__Senha: ${ADMIN_PASSWORD}
+      StorageSettings__BasePath: "/arquivos"
+      AllowedOrigins__0: "http://${SERVER_IP}"
+      AllowedOrigins__1: "http://localhost"
+    volumes:
+      - /var/sig-defesa-civil/arquivos:/arquivos
+    ports:
+      - "127.0.0.1:8080:8080"   # exposto apenas para o nginx
+
+  # ── Nginx: proxy reverso + frontend estático ──────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./www:/usr/share/nginx/html:ro   # frontend Angular compilado
+
+volumes:
+  pgdata:
+    driver: local
