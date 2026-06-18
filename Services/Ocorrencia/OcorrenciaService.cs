@@ -366,7 +366,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
 
                     NomeVistoriador1 = o.Agendamentos
                         .OrderByDescending(a => a.Numero)
-                        .FirstOrDefault()?.Vistoriador1.Nome,
+                        .FirstOrDefault()?.Vistoriador1?.Nome,
 
                     AbertaEm = o.AbertaEm,
                     AtualizadoEm = o.AtualizadoEm,
@@ -708,9 +708,11 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         Id = a.Id,
                         Numero = a.Numero,
                         Status = a.Status.ToString(),
+                        Data = a.Data,
+                        Turno = a.Turno?.ToString(),
                         Vistoriador1Id = a.Vistoriador1Id,
-                        NomeVistoriador1 = a.Vistoriador1.Nome,
-                        MatriculaVistoriador1 = a.Vistoriador1.Matricula,
+                        NomeVistoriador1 = a.Vistoriador1?.Nome,
+                        MatriculaVistoriador1 = a.Vistoriador1?.Matricula,
                         Vistoriador2Id = a.Vistoriador2Id,
                         NomeVistoriador2 = a.Vistoriador2?.Nome,
                         MatriculaVistoriador2 = a.Vistoriador2?.Matricula,

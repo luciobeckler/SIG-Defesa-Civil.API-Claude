@@ -26,10 +26,20 @@ namespace SIG_Defesa_Civil.API.Data.Models.Tabelas
         /// <summary>Estado do ciclo de vida do agendamento.</summary>
         public StatusAgendamento Status { get; set; } = StatusAgendamento.ATIVO;
 
-        // ── Equipe designada ─────────────────────────────────────────────────────
-        /// <summary>Vistoriador principal (obrigatório).</summary>
-        public int Vistoriador1Id { get; set; }
-        public Usuario Vistoriador1 { get; set; } = null!;
+        // ── Turno e data (definidos no agendamento) ──────────────────────────────
+        /// <summary>Data planejada da visita. Campo de primeira classe usado pelo calendário.</summary>
+        public DateOnly? Data { get; set; }
+
+        /// <summary>Turno preferencial da visita (Manhã ou Tarde).</summary>
+        public TurnoVistoria? Turno { get; set; }
+
+        // ── Equipe designada (atribuída em passo posterior ao agendamento) ───────
+        /// <summary>
+        /// Vistoriador principal — designado em passo posterior ao agendamento, antes da
+        /// visita, para permitir o download da ocorrência para uso offline. Nulo até a atribuição.
+        /// </summary>
+        public int? Vistoriador1Id { get; set; }
+        public Usuario? Vistoriador1 { get; set; }
 
         /// <summary>Segundo vistoriador — duplas são o padrão operacional, mas é opcional.</summary>
         public int? Vistoriador2Id { get; set; }

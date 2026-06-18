@@ -9,9 +9,13 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public int Numero { get; set; }
         public string Status { get; set; } = string.Empty;
 
-        // Equipe designada
-        public int Vistoriador1Id { get; set; }
-        public string NomeVistoriador1 { get; set; } = string.Empty;
+        // Data e turno agendados
+        public DateOnly? Data { get; set; }
+        public string? Turno { get; set; }
+
+        // Equipe (preenchida ao registrar a vistoria presencial — Etapa 4)
+        public int? Vistoriador1Id { get; set; }
+        public string? NomeVistoriador1 { get; set; }
         public string? MatriculaVistoriador1 { get; set; }
 
         public int? Vistoriador2Id { get; set; }

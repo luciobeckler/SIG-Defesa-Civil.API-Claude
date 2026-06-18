@@ -48,26 +48,26 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
                     $"O agendamento só pode ser criado quando a ocorrência está EM_AVALIACAO ou VISTORIA_SOLICITADA. " +
                     $"Status atual: {ocorrencia.Status}.");
 
-            if (request.Vistoriador2Id.HasValue && request.Vistoriador2Id == request.Vistoriador1Id)
-                throw new InvalidOperationException("O vistoriador 1 e o vistoriador 2 não podem ser o mesmo usuário.");
-
-            await ValidarVistoriadorAsync(request.Vistoriador1Id, 1);
-            if (request.Vistoriador2Id.HasValue)
-                await ValidarVistoriadorAsync(request.Vistoriador2Id.Value, 2);
-
             // Auto-incrementa o número do agendamento dentro da ocorrência
             var proximoNumero = await _context.AgendamentosVistoria
                 .Where(a => a.OcorrenciaId == ocorrenciaId)
                 .MaxAsync(a => (int?)a.Numero) ?? 0;
             proximoNumero += 1;
 
+            // Deriva a hora de referência da tentativa a partir do turno e força UTC
+            var horaReferencia = request.Turno == TurnoVistoria.MANHA
+                ? new TimeOnly(8, 0)
+                : new TimeOnly(13, 0);
+            var dataHoraTentativa = DateTime.SpecifyKind(
+                request.Data.ToDateTime(horaReferencia), DateTimeKind.Utc);
+
             var agendamento = new AgendamentoVistoria
             {
                 OcorrenciaId = ocorrenciaId,
                 Numero = proximoNumero,
                 Status = StatusAgendamento.ATIVO,
-                Vistoriador1Id = request.Vistoriador1Id,
-                Vistoriador2Id = request.Vistoriador2Id,
+                Data = request.Data,
+                Turno = request.Turno,
                 AgendadoPorId = usuarioId,
                 AgendadoEm = DateTime.UtcNow
             };
@@ -80,7 +80,7 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             {
                 AgendamentoId = agendamento.Id,
                 NumeroTentativa = 1,
-                DataHoraTentativa = request.DataHoraPrimeiraTentativa,
+                DataHoraTentativa = dataHoraTentativa,
                 Observacao = request.Observacao,
                 RegistradoEm = DateTime.UtcNow
             };
@@ -97,10 +97,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
-                "Agendamento #{Numero} criado. Ocorrência {Protocolo} → VISTORIA_SOLICITADA. " +
-                "Vistoriadores: {V1} / {V2}",
-                proximoNumero, ocorrencia.Protocolo,
-                request.Vistoriador1Id, request.Vistoriador2Id?.ToString() ?? "-");
+                "Agendamento #{Numero} criado. Ocorrência {Protocolo} → VISTORIA_SOLICITADA. Turno: {Turno}",
+                proximoNumero, ocorrencia.Protocolo, request.Turno);
 
             return await ObterAgendamentoDtoAsync(agendamento.Id);
         }
@@ -173,6 +171,51 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             return MapearAgendamentoDto(agendamento);
         }
 
+        public async Task<AgendamentoVistoriaDto> AtribuirVistoriadoresAsync(
+            int ocorrenciaId,
+            int agendamentoId,
+            AtribuirVistoriadoresRequest request,
+            int usuarioId)
+        {
+            var agendamento = await _context.AgendamentosVistoria
+                .Include(a => a.Vistoriador1)
+                .Include(a => a.Vistoriador2)
+                .Include(a => a.AgendadoPor)
+                .Include(a => a.Tentativas)
+                .FirstOrDefaultAsync(a => a.Id == agendamentoId && a.OcorrenciaId == ocorrenciaId)
+                ?? throw new InvalidOperationException(
+                    $"Agendamento {agendamentoId} não encontrado para a ocorrência {ocorrenciaId}.");
+
+            if (agendamento.Status != StatusAgendamento.ATIVO)
+                throw new InvalidOperationException(
+                    $"Só é possível atribuir vistoriadores a agendamentos ATIVOS. Status atual: {agendamento.Status}.");
+
+            // Valida a equipe designada
+            await ValidarVistoriadorAsync(request.Vistoriador1Id, 1);
+            if (request.Vistoriador2Id.HasValue)
+            {
+                if (request.Vistoriador2Id == request.Vistoriador1Id)
+                    throw new InvalidOperationException("O vistoriador 1 e o vistoriador 2 não podem ser o mesmo usuário.");
+                await ValidarVistoriadorAsync(request.Vistoriador2Id.Value, 2);
+            }
+
+            agendamento.Vistoriador1Id = request.Vistoriador1Id;
+            agendamento.Vistoriador2Id = request.Vistoriador2Id;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Vistoriadores atribuídos ao agendamento {AgendamentoId} (ocorrência {OcorrenciaId}) pelo usuário {UsuarioId}",
+                agendamentoId, ocorrenciaId, usuarioId);
+
+            // Recarrega as referências para refletir os nomes/matrículas na resposta
+            await _context.Entry(agendamento).Reference(a => a.Vistoriador1).LoadAsync();
+            if (agendamento.Vistoriador2Id.HasValue)
+                await _context.Entry(agendamento).Reference(a => a.Vistoriador2).LoadAsync();
+
+            return MapearAgendamentoDto(agendamento);
+        }
+
         public async Task ExcluirAgendamentoAsync(int ocorrenciaId, int agendamentoId, int usuarioId)
         {
             var agendamento = await _context.AgendamentosVistoria
@@ -211,16 +254,24 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             if (request.HorarioTermino <= request.HorarioInicio)
                 throw new InvalidOperationException("O horário de término deve ser posterior ao horário de início.");
 
-            // Valida o agendamento vinculado (se informado)
-            if (request.AgendamentoId.HasValue)
-            {
-                var agendamentoVinculado = await _context.AgendamentosVistoria
+            // Resolve o agendamento de origem: o informado, ou o ATIVO da ocorrência.
+            // A equipe executora é derivada dos vistoriadores designados nele.
+            var agendamentoOrigem = request.AgendamentoId.HasValue
+                ? await _context.AgendamentosVistoria
                     .FirstOrDefaultAsync(a => a.Id == request.AgendamentoId.Value
-                                           && a.OcorrenciaId == ocorrenciaId);
-                if (agendamentoVinculado == null)
-                    throw new InvalidOperationException(
-                        $"Agendamento {request.AgendamentoId} não encontrado para esta ocorrência.");
-            }
+                                           && a.OcorrenciaId == ocorrenciaId)
+                  ?? throw new InvalidOperationException(
+                        $"Agendamento {request.AgendamentoId} não encontrado para esta ocorrência.")
+                : await _context.AgendamentosVistoria
+                    .Where(a => a.OcorrenciaId == ocorrenciaId && a.Status == StatusAgendamento.ATIVO)
+                    .OrderByDescending(a => a.Numero)
+                    .FirstOrDefaultAsync()
+                  ?? throw new InvalidOperationException(
+                        "Não há agendamento ativo para esta ocorrência. Crie um agendamento antes de registrar a vistoria.");
+
+            if (!agendamentoOrigem.Vistoriador1Id.HasValue)
+                throw new InvalidOperationException(
+                    "Atribua os vistoriadores ao agendamento antes de registrar a vistoria.");
 
             var totalMoradores = request.TotalMoradores
                 ?? (request.NumeroAdultos + request.NumeroCriancas + request.NumeroIdosos + request.NumeroDeficientes);
@@ -235,7 +286,9 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             {
                 OcorrenciaId = ocorrenciaId,
                 Numero = proximoNumero,
-                AgendamentoId = request.AgendamentoId,
+                AgendamentoId = agendamentoOrigem.Id,
+                Vistoriador1Id = agendamentoOrigem.Vistoriador1Id.Value,
+                Vistoriador2Id = agendamentoOrigem.Vistoriador2Id,
                 DataVistoria = request.DataVistoria,
                 HorarioInicio = request.HorarioInicio,
                 HorarioTermino = request.HorarioTermino,
@@ -271,14 +324,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
 
             _context.Vistorias.Add(vistoria);
 
-            // Marca o agendamento vinculado como CONCLUIDO
-            if (request.AgendamentoId.HasValue)
-            {
-                var agendamento = await _context.AgendamentosVistoria
-                    .FirstOrDefaultAsync(a => a.Id == request.AgendamentoId.Value);
-                if (agendamento != null)
-                    agendamento.Status = StatusAgendamento.CONCLUIDO;
-            }
+            // Marca o agendamento de origem como CONCLUIDO
+            agendamentoOrigem.Status = StatusAgendamento.CONCLUIDO;
 
             ocorrencia.Status = StatusOcorrencia.VISTORIA_REALIZADA;
             ocorrencia.AtualizadoEm = DateTime.UtcNow;
@@ -290,6 +337,9 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
                 proximoNumero, ocorrencia.Protocolo);
 
             await _context.Entry(vistoria).Reference(v => v.RegistradoPor).LoadAsync();
+            await _context.Entry(vistoria).Reference(v => v.Vistoriador1).LoadAsync();
+            if (vistoria.Vistoriador2Id.HasValue)
+                await _context.Entry(vistoria).Reference(v => v.Vistoriador2).LoadAsync();
             return MapearVistoriaDto(vistoria);
         }
 
@@ -297,6 +347,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
         {
             var vistorias = await _context.Vistorias
                 .Include(v => v.RegistradoPor)
+                .Include(v => v.Vistoriador1)
+                .Include(v => v.Vistoriador2)
                 .Where(v => v.OcorrenciaId == ocorrenciaId)
                 .OrderBy(v => v.Numero)
                 .ToListAsync();
@@ -308,6 +360,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
         {
             var vistoria = await _context.Vistorias
                 .Include(v => v.RegistradoPor)
+                .Include(v => v.Vistoriador1)
+                .Include(v => v.Vistoriador2)
                 .FirstOrDefaultAsync(v => v.Id == vistoriaId);
 
             return vistoria == null ? null : MapearVistoriaDto(vistoria);
@@ -320,6 +374,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
         {
             var vistoria = await _context.Vistorias
                 .Include(v => v.RegistradoPor)
+                .Include(v => v.Vistoriador1)
+                .Include(v => v.Vistoriador2)
                 .FirstOrDefaultAsync(v => v.Id == vistoriaId)
                 ?? throw new InvalidOperationException(
                     $"Vistoria {vistoriaId} não encontrada. Use o endpoint de criação (POST).");
@@ -327,6 +383,7 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             if (request.HorarioTermino <= request.HorarioInicio)
                 throw new InvalidOperationException("O horário de término deve ser posterior ao horário de início.");
 
+            // A equipe executora não é alterada aqui — ela é definida na atribuição do agendamento.
             vistoria.DataVistoria = request.DataVistoria;
             vistoria.HorarioInicio = request.HorarioInicio;
             vistoria.HorarioTermino = request.HorarioTermino;
@@ -463,9 +520,11 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             Id = a.Id,
             Numero = a.Numero,
             Status = a.Status.ToString(),
+            Data = a.Data,
+            Turno = a.Turno?.ToString(),
             Vistoriador1Id = a.Vistoriador1Id,
-            NomeVistoriador1 = a.Vistoriador1.Nome,
-            MatriculaVistoriador1 = a.Vistoriador1.Matricula,
+            NomeVistoriador1 = a.Vistoriador1?.Nome,
+            MatriculaVistoriador1 = a.Vistoriador1?.Matricula,
             Vistoriador2Id = a.Vistoriador2Id,
             NomeVistoriador2 = a.Vistoriador2?.Nome,
             MatriculaVistoriador2 = a.Vistoriador2?.Matricula,
@@ -515,6 +574,10 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             Orientacoes = v.Orientacoes,
             Observacoes = v.Observacoes,
             EncaminhamentosDeCampo = v.EncaminhamentosDeCampo,
+            NomeVistoriador1 = v.Vistoriador1.Nome,
+            MatriculaVistoriador1 = v.Vistoriador1.Matricula,
+            NomeVistoriador2 = v.Vistoriador2?.Nome,
+            MatriculaVistoriador2 = v.Vistoriador2?.Matricula,
             RegistradoPor = v.RegistradoPor.Nome,
             RegistradoEm = v.RegistradoEm
         };

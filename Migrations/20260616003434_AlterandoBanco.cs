@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace SIG_Defesa_Civil.API.Migrations
 {
     /// <inheritdoc />
-    public partial class Alteracaonafichadevistoria : Migration
+    public partial class AlterandoBanco : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -87,7 +87,8 @@ namespace SIG_Defesa_Civil.API.Migrations
                     OcorrenciaId = table.Column<int>(type: "integer", nullable: false),
                     Numero = table.Column<int>(type: "integer", nullable: false),
                     Status = table.Column<string>(type: "text", nullable: false),
-                    Vistoriador1Id = table.Column<int>(type: "integer", nullable: false),
+                    Turno = table.Column<int>(type: "integer", nullable: true),
+                    Vistoriador1Id = table.Column<int>(type: "integer", nullable: true),
                     Vistoriador2Id = table.Column<int>(type: "integer", nullable: true),
                     AgendadoPorId = table.Column<int>(type: "integer", nullable: false),
                     AgendadoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
@@ -331,6 +332,8 @@ namespace SIG_Defesa_Civil.API.Migrations
                     Orientacoes = table.Column<int[]>(type: "integer[]", nullable: false),
                     Observacoes = table.Column<string>(type: "text", nullable: true),
                     EncaminhamentosDeCampo = table.Column<int[]>(type: "integer[]", nullable: false),
+                    Vistoriador1Id = table.Column<int>(type: "integer", nullable: false),
+                    Vistoriador2Id = table.Column<int>(type: "integer", nullable: true),
                     RegistradoPorId = table.Column<int>(type: "integer", nullable: false),
                     RegistradoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     AtualizadoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
@@ -356,6 +359,17 @@ namespace SIG_Defesa_Civil.API.Migrations
                         principalTable: "usuarios",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_vistorias_usuarios_Vistoriador1Id",
+                        column: x => x.Vistoriador1Id,
+                        principalTable: "usuarios",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_vistorias_usuarios_Vistoriador2Id",
+                        column: x => x.Vistoriador2Id,
+                        principalTable: "usuarios",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -639,6 +653,16 @@ namespace SIG_Defesa_Civil.API.Migrations
                 name: "IX_vistorias_RegistradoPorId",
                 table: "vistorias",
                 column: "RegistradoPorId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_vistorias_Vistoriador1Id",
+                table: "vistorias",
+                column: "Vistoriador1Id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_vistorias_Vistoriador2Id",
+                table: "vistorias",
+                column: "Vistoriador2Id");
         }
 
         /// <inheritdoc />

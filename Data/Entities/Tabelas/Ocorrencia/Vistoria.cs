@@ -90,6 +90,15 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         /// </summary>
         public List<Encaminhamento> EncaminhamentosDeCampo { get; set; } = new();
 
+        // ── Equipe que realizou a vistoria ───────────────────────────────────────
+        /// <summary>Vistoriador principal — obrigatório ao registrar a vistoria.</summary>
+        public int Vistoriador1Id { get; set; }
+        public Usuario Vistoriador1 { get; set; } = null!;
+
+        /// <summary>Segundo vistoriador (opcional).</summary>
+        public int? Vistoriador2Id { get; set; }
+        public Usuario? Vistoriador2 { get; set; }
+
         // ── Auditoria ────────────────────────────────────────────────────────────
         public int RegistradoPorId { get; set; }
         public Usuario RegistradoPor { get; set; } = null!;

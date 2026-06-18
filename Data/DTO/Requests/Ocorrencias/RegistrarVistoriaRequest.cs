@@ -11,7 +11,9 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
     {
         /// <summary>
         /// ID do agendamento ao qual esta vistoria está vinculada (opcional).
-        /// Se informado, o agendamento terá seu status atualizado para CONCLUIDO.
+        /// Se omitido, o serviço usa o agendamento ATIVO da ocorrência.
+        /// A equipe executora é derivada dos vistoriadores designados nesse agendamento.
+        /// Ao registrar, o agendamento tem seu status atualizado para CONCLUIDO.
         /// </summary>
         public int? AgendamentoId { get; set; }
 

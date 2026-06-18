@@ -193,6 +193,49 @@ namespace SIG_Defesa_Civil.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Atribui a equipe de vistoriadores a um agendamento (passo posterior ao agendamento).
+        /// Os vistoriadores designados poderão baixar a ocorrência para uso offline antes da visita.
+        /// Pré-condição: agendamento deve pertencer à ocorrência e estar ATIVO.
+        /// </summary>
+        /// <param name="ocorrenciaId">ID da ocorrência</param>
+        /// <param name="agendamentoId">ID do agendamento</param>
+        /// <param name="request">Vistoriador principal (obrigatório) e auxiliar (opcional)</param>
+        /// <response code="200">Vistoriadores atribuídos</response>
+        /// <response code="404">Agendamento não encontrado</response>
+        /// <response code="422">Status inválido ou vistoriadores inválidos</response>
+        [HttpPut("agendamentos/{agendamentoId:int}/vistoriadores")]
+        [ProducesResponseType(typeof(ApiResponse<AgendamentoVistoriaDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> AtribuirVistoriadores(
+            [FromRoute] int ocorrenciaId,
+            [FromRoute] int agendamentoId,
+            [FromBody] AtribuirVistoriadoresRequest request)
+        {
+            try
+            {
+                var resultado = await _vistoriaService.AtribuirVistoriadoresAsync(
+                    ocorrenciaId, agendamentoId, request, ObterUsuarioIdInterno());
+
+                return Ok(ApiResponse<AgendamentoVistoriaDto>.Success(
+                    resultado, "Vistoriadores atribuídos com sucesso"));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrado"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger,
+                    $"AtribuirVistoriadores(ocorrencia={ocorrenciaId}, agendamento={agendamentoId})");
+            }
+        }
+
         // ══════════════════════════════════════════════════════════════════════════
         // ETAPA 4 — VISTORIA PRESENCIAL
         // ══════════════════════════════════════════════════════════════════════════

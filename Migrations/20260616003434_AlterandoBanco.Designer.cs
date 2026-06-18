@@ -12,8 +12,8 @@ using SIG_Defesa_Civil.API.Data.Models;
 namespace SIG_Defesa_Civil.API.Migrations
 {
     [DbContext(typeof(DefesaCivilContext))]
-    [Migration("20260513023349_Alteracao na ficha de vistoria")]
-    partial class Alteracaonafichadevistoria
+    [Migration("20260616003434_AlterandoBanco")]
+    partial class AlterandoBanco
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -398,6 +398,12 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<int>("TotalMoradores")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Vistoriador1Id")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Vistoriador2Id")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AgendamentoId");
@@ -407,6 +413,10 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.HasIndex("GrauRiscoEncontrado");
 
                     b.HasIndex("RegistradoPorId");
+
+                    b.HasIndex("Vistoriador1Id");
+
+                    b.HasIndex("Vistoriador2Id");
 
                     b.HasIndex("OcorrenciaId", "Numero")
                         .IsUnique();
@@ -438,7 +448,10 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("Vistoriador1Id")
+                    b.Property<int?>("Turno")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Vistoriador1Id")
                         .HasColumnType("integer");
 
                     b.Property<int?>("Vistoriador2Id")
@@ -808,11 +821,25 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Vistoriador1")
+                        .WithMany()
+                        .HasForeignKey("Vistoriador1Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Vistoriador2")
+                        .WithMany()
+                        .HasForeignKey("Vistoriador2Id");
+
                     b.Navigation("Agendamento");
 
                     b.Navigation("Ocorrencia");
 
                     b.Navigation("RegistradoPor");
+
+                    b.Navigation("Vistoriador1");
+
+                    b.Navigation("Vistoriador2");
                 });
 
             modelBuilder.Entity("SIG_Defesa_Civil.API.Data.Models.Tabelas.AgendamentoVistoria", b =>
@@ -832,8 +859,7 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Vistoriador1")
                         .WithMany()
                         .HasForeignKey("Vistoriador1Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SIG_Defesa_Civil.API.Data.Models.Tabelas.Usuario", "Vistoriador2")
                         .WithMany()

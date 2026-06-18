@@ -78,6 +78,9 @@
         CANCELADO
     }
 
+    /// <summary>Turno da visita agendada.</summary>
+    public enum TurnoVistoria { MANHA, TARDE }
+
     // ─── Etapa 4 — Vistoria Presencial ───────────────────────────────────────────
 
     /// <summary>Caracterização geomorfológica do local vistoriado.</summary>

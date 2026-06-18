@@ -1,22 +1,20 @@
+using SIG_Defesa_Civil.API.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
 {
     /// <summary>
-    /// Designação da equipe de vistoriadores — Etapa 3.
+    /// Agendamento de vistoria — Etapa 3.
+    /// Registra apenas data e turno. Os vistoriadores são designados ao registrar a vistoria (Etapa 4).
     /// Ao registrar, o status avança para VISTORIA_SOLICITADA.
-    /// As tentativas de comparecimento são adicionadas separadamente via AdicionarTentativaRequest.
     /// </summary>
     public class RegistrarAgendamentoVistoriaRequest
     {
-        /// <summary>ID do vistoriador principal (obrigatório).</summary>
-        [Required] public int Vistoriador1Id { get; set; }
+        /// <summary>Data prevista para a visita.</summary>
+        [Required] public DateOnly Data { get; set; }
 
-        /// <summary>ID do segundo vistoriador. Duplas são o padrão operacional.</summary>
-        public int? Vistoriador2Id { get; set; }
-
-        /// <summary>Primeira tentativa de data/hora para a visita.</summary>
-        [Required] public DateTime DataHoraPrimeiraTentativa { get; set; }
+        /// <summary>Turno preferencial da visita (Manhã ou Tarde).</summary>
+        [Required] public TurnoVistoria Turno { get; set; }
 
         /// <summary>Observação opcional sobre o agendamento.</summary>
         public string? Observacao { get; set; }

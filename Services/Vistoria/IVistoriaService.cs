@@ -41,13 +41,24 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             AdicionarTentativaRequest request,
             int usuarioId);
 
+        /// <summary>
+        /// Atribui a equipe de vistoriadores a um agendamento — passo posterior ao
+        /// agendamento. Os vistoriadores designados poderão baixar a ocorrência para
+        /// uso offline. Pré-condição: agendamento deve pertencer à ocorrência e estar ATIVO.
+        /// </summary>
+        Task<AgendamentoVistoriaDto> AtribuirVistoriadoresAsync(
+            int ocorrenciaId,
+            int agendamentoId,
+            AtribuirVistoriadoresRequest request,
+            int usuarioId);
+
         // ── Etapa 4: Vistoria Presencial ──────────────────────────────────────────
 
         /// <summary>
         /// Registra o resultado da vistoria presencial de campo.
-        /// Pré-condição: ocorrência deve estar em VISTORIA_SOLICITADA.
-        /// Status avança para VISTORIA_REALIZADA.
-        /// Se request.AgendamentoId informado, marca o agendamento como CONCLUIDO.
+        /// Pré-condição: ocorrência deve estar em VISTORIA_SOLICITADA e o agendamento
+        /// ATIVO já deve ter os vistoriadores atribuídos (a equipe é derivada dele).
+        /// Status avança para VISTORIA_REALIZADA e o agendamento é marcado como CONCLUIDO.
         /// </summary>
         Task<VistoriaDto> RegistrarVistoriaAsync(
             int ocorrenciaId,

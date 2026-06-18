@@ -28,7 +28,8 @@
       "Bash(powershell -Command \"Get-Item 'sig-defesa-civil-frontend\\\\src\\\\app\\\\features\\\\ocorrencias\\\\detalhe\\\\detalhe.page.ts' -ErrorAction Stop | Select-Object -ExpandProperty FullName\")",
       "Bash(powershell -Command \"Get-Item 'sig-defesa-civil-frontend\\\\src\\\\app\\\\features\\\\ocorrencias\\\\nova\\\\nova.page.ts' -ErrorAction Stop | Select-Object -ExpandProperty FullName\")",
       "Bash(mkdir \"C:\\\\Users\\\\lucio\\\\Desktop\\\\TCC\\\\Sistema - Defesa Civil\\\\sig-defesa-civil-frontend\\\\src\\\\app\\\\shared\\\\components\\\\assinatura-modal\")",
-      "Bash(npx --prefix \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend\" tsc --noEmit --project \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend/tsconfig.json\")"
+      "Bash(npx --prefix \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend\" tsc --noEmit --project \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend/tsconfig.json\")",
+      "Bash(node \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend/node_modules/.bin/tsc\" --noEmit --project \"C:/Users/lucio/Desktop/TCC/Sistema - Defesa Civil/sig-defesa-civil-frontend/tsconfig.app.json\")"
     ]
   }
 }

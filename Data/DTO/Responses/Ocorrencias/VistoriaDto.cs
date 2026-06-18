@@ -51,6 +51,12 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public string? Observacoes { get; set; }
         public List<Encaminhamento> EncaminhamentosDeCampo { get; set; } = new();
 
+        // Equipe executora
+        public string NomeVistoriador1 { get; set; } = string.Empty;
+        public string? MatriculaVistoriador1 { get; set; }
+        public string? NomeVistoriador2 { get; set; }
+        public string? MatriculaVistoriador2 { get; set; }
+
         public string RegistradoPor { get; set; } = string.Empty;
         public DateTime RegistradoEm { get; set; }
     }
