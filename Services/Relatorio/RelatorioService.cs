@@ -69,7 +69,7 @@ namespace SIG_Defesa_Civil.API.Services.Relatorio
             var encaminhamentosStr = vistoria.EncaminhamentosDeCampo.Count > 0
                 ? string.Join(", ", vistoria.EncaminhamentosDeCampo.Select(FormatarEncaminhamento))
                 : ocorrencia.EncaminhamentoFinal?.Encaminhamentos.Count > 0
-                    ? string.Join(", ", ocorrencia.EncaminhamentoFinal.Encaminhamentos.Select(FormatarEncaminhamento))
+                    ? string.Join(", ", ocorrencia.EncaminhamentoFinal.Encaminhamentos.Select(e => FormatarEncaminhamento(e.ToString())))
                     : string.Empty;
 
             var tags = new Dictionary<string, string>
@@ -225,18 +225,20 @@ namespace SIG_Defesa_Civil.API.Services.Relatorio
 
         // ── Formatação de enums ───────────────────────────────────────────────────────
 
-        private static string FormatarEncaminhamento(EncaminhamentoEnum e) => e switch
+        // Aceita tanto os valores do enum (ex.: "SEC_OBRAS") quanto opções
+        // personalizadas (texto livre), que são exibidas como foram digitadas.
+        private static string FormatarEncaminhamento(string valor) => valor switch
         {
-            EncaminhamentoEnum.AJUDA_HUMANITARIA         => "Ajuda Humanitária",
-            EncaminhamentoEnum.CEMIG                     => "CEMIG",
-            EncaminhamentoEnum.COPASA                    => "COPASA",
-            EncaminhamentoEnum.DNIT                      => "DNIT",
-            EncaminhamentoEnum.OUTROS                    => "Outros",
-            EncaminhamentoEnum.PROVIDENCIAS_PELO_MORADOR => "Providências pelo Morador",
-            EncaminhamentoEnum.SEC_DESENV_SOCIAL         => "Sec. Desenvolvimento Social",
-            EncaminhamentoEnum.SEC_MEIO_AMBIENTE         => "Sec. Meio Ambiente",
-            EncaminhamentoEnum.SEC_OBRAS                 => "Sec. Obras",
-            _                                            => e.ToString()
+            "AJUDA_HUMANITARIA"         => "Ajuda Humanitária",
+            "CEMIG"                     => "CEMIG",
+            "COPASA"                    => "COPASA",
+            "DNIT"                      => "DNIT",
+            "OUTROS"                    => "Outros",
+            "PROVIDENCIAS_PELO_MORADOR" => "Providências pelo Morador",
+            "SEC_DESENV_SOCIAL"         => "Sec. Desenvolvimento Social",
+            "SEC_MEIO_AMBIENTE"         => "Sec. Meio Ambiente",
+            "SEC_OBRAS"                 => "Sec. Obras",
+            _                           => valor
         };
     }
 }

@@ -28,8 +28,9 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         /// <summary>
         /// GrauRiscoEncontrado da última vistoria quando existe vistoria realizada;
         /// caso contrário, GrauRiscoInicial da avaliação de risco. Null se nenhuma etapa concluída.
+        /// Texto: pode ser um valor do enum GrauRisco ou uma opção personalizada.
         /// </summary>
-        public GrauRisco? GrauRiscoEfetivo { get; set; }
+        public string? GrauRiscoEfetivo { get; set; }
 
         // ── Etapa 3 (resumo) ──────────────────────────────────────────────────────
         public string? NomeVistoriador1 { get; set; }

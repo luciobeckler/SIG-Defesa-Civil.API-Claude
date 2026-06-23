@@ -23,11 +23,12 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
         [Required] public TimeSpan HorarioTermino { get; set; }
 
         // ── Caracterização do local ──────────────────────────────────────────────
+        // Campos de seleção são texto: aceitam valores dos enums e opções personalizadas.
         public string? DescricaoDoLocal { get; set; }
-        public CaracterizacaoLocal? CaracterizacaoDoLocal { get; set; }
+        public string? CaracterizacaoDoLocal { get; set; }
 
-        [Required] public TipoEdificacao Edificacao { get; set; }
-        [Required] public TipoEstrutura Estrutura { get; set; }
+        [Required] public string Edificacao { get; set; } = string.Empty;
+        [Required] public string Estrutura { get; set; } = string.Empty;
 
         // ── Dados da edificação ──────────────────────────────────────────────────
         [Range(0, int.MaxValue)] public int NumeroMoradias { get; set; }
@@ -49,33 +50,33 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
         public int? TotalMoradores { get; set; }
 
         // ── Classificação de risco ───────────────────────────────────────────────
-        [Required] public TipoRiscoVistoria TipoRisco { get; set; }
-        [Required] public GrauRisco GrauRiscoEncontrado { get; set; }
+        [Required] public string TipoRisco { get; set; } = string.Empty;
+        [Required] public string GrauRiscoEncontrado { get; set; } = string.Empty;
 
         /// <summary>Tipificações identificadas em campo — multi-select (mínimo 1).</summary>
         [Required, MinLength(1, ErrorMessage = "Informe ao menos uma tipificação.")]
-        public List<TipificacaoOcorrencia> TipificacaoOcorrencia { get; set; } = new();
+        public List<string> TipificacaoOcorrencia { get; set; } = new();
 
-        [Required] public RegimeOcupacaoImovel RegimeOcupacao { get; set; }
+        [Required] public string RegimeOcupacao { get; set; } = string.Empty;
 
         // ── Conclusões ───────────────────────────────────────────────────────────
         /// <summary>Causas/motivações — multi-select.</summary>
-        public List<Motivacao> Motivacao { get; set; } = new();
+        public List<string> Motivacao { get; set; } = new();
 
         /// <summary>Áreas afetadas — multi-select (mínimo 1).</summary>
         [Required, MinLength(1, ErrorMessage = "Informe ao menos uma área afetada.")]
-        public List<AreaAfetada> AreasAfetadas { get; set; } = new();
+        public List<string> AreasAfetadas { get; set; } = new();
 
-        [Required] public TipoInterdicao Interdicao { get; set; }
-        [Required] public TipoRemocao Remocao { get; set; }
+        [Required] public string Interdicao { get; set; } = string.Empty;
+        [Required] public string Remocao { get; set; } = string.Empty;
 
         /// <summary>Orientações ao morador — multi-select.</summary>
-        public List<Orientacao> Orientacoes { get; set; } = new();
+        public List<string> Orientacoes { get; set; } = new();
 
         /// <summary>Observações livres registradas em campo.</summary>
         public string? Observacoes { get; set; }
 
         /// <summary>Encaminhamentos imediatos registrados em campo — multi-select.</summary>
-        public List<Encaminhamento> EncaminhamentosDeCampo { get; set; } = new();
+        public List<string> EncaminhamentosDeCampo { get; set; } = new();
     }
 }

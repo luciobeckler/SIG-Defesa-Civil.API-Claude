@@ -16,11 +16,11 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public TimeSpan HorarioInicio { get; set; }
         public TimeSpan HorarioTermino { get; set; }
 
-        // Caracterização
+        // Caracterização (campos de seleção = texto: enums + opções personalizadas)
         public string? DescricaoDoLocal { get; set; }
-        public CaracterizacaoLocal? CaracterizacaoDoLocal { get; set; }
-        public TipoEdificacao Edificacao { get; set; }
-        public TipoEstrutura Estrutura { get; set; }
+        public string? CaracterizacaoDoLocal { get; set; }
+        public string Edificacao { get; set; } = string.Empty;
+        public string Estrutura { get; set; } = string.Empty;
 
         // Edificação
         public int NumeroMoradias { get; set; }
@@ -37,19 +37,19 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public int TotalMoradores { get; set; }
 
         // Classificação de risco
-        public TipoRiscoVistoria TipoRisco { get; set; }
-        public GrauRisco GrauRiscoEncontrado { get; set; }
-        public List<TipificacaoOcorrencia> TipificacaoOcorrencia { get; set; } = new();
-        public RegimeOcupacaoImovel RegimeOcupacao { get; set; }
+        public string TipoRisco { get; set; } = string.Empty;
+        public string GrauRiscoEncontrado { get; set; } = string.Empty;
+        public List<string> TipificacaoOcorrencia { get; set; } = new();
+        public string RegimeOcupacao { get; set; } = string.Empty;
 
         // Conclusões
-        public List<Motivacao> Motivacao { get; set; } = new();
-        public List<AreaAfetada> AreasAfetadas { get; set; } = new();
-        public TipoInterdicao Interdicao { get; set; }
-        public TipoRemocao Remocao { get; set; }
-        public List<Orientacao> Orientacoes { get; set; } = new();
+        public List<string> Motivacao { get; set; } = new();
+        public List<string> AreasAfetadas { get; set; } = new();
+        public string Interdicao { get; set; } = string.Empty;
+        public string Remocao { get; set; } = string.Empty;
+        public List<string> Orientacoes { get; set; } = new();
         public string? Observacoes { get; set; }
-        public List<Encaminhamento> EncaminhamentosDeCampo { get; set; } = new();
+        public List<string> EncaminhamentosDeCampo { get; set; } = new();
 
         // Equipe executora
         public string NomeVistoriador1 { get; set; } = string.Empty;

@@ -82,113 +82,13 @@
     public enum TurnoVistoria { MANHA, TARDE }
 
     // ─── Etapa 4 — Vistoria Presencial ───────────────────────────────────────────
-
-    /// <summary>Caracterização geomorfológica do local vistoriado.</summary>
-    public enum CaracterizacaoLocal
-    {
-        DE_CORTE,
-        ENCOSTA_MORRO,
-        MARGEM_CORREGO_RIO,
-        RURAL,
-        URBANA
-    }
-
-    public enum TipoEdificacao
-    {
-        BARRACAO,
-        CASA,
-        COMERCIO,
-        GALPAO,
-        PREDIO
-    }
-
-    public enum TipoEstrutura
-    {
-        ALVENARIA,
-        CONCRETO_ARMADO,
-        MADEIRA,
-        OUTROS_MATERIAIS,
-        PRE_FABRICADO
-    }
-
-    public enum TipoRiscoVistoria
-    {
-        BIOLOGICO,
-        CONSTRUTIVO,
-        GEOLOGICO,
-        HIDROLOGICO,
-        TECNOLOGICO,
-        OUTROS
-    }
-
-    public enum RegimeOcupacaoImovel
-    {
-        PROPRIO,
-        ALUGADO,
-        CEDIDO,
-        IRREGULAR,
-        OUTROS
-    }
-
-    /// <summary>Áreas do imóvel/entorno afetadas — multi-select.</summary>
-    public enum AreaAfetada
-    {
-        COMERCIO,
-        GALPAO,
-        MURO,
-        OUTROS,
-        PONTE,
-        PREDIO_PUBLICO,
-        RESIDENCIA,
-        VIA_PUBLICA
-    }
-
-    public enum TipoInterdicao
-    {
-        NAO_NECESSARIA,
-        PARCIAL,
-        TOTAL
-    }
-
-    public enum TipoRemocao
-    {
-        NAO_NECESSARIA,
-        TEMPORARIA,
-        DEFINITIVA
-    }
-
-    /// <summary>Causas/motivações identificadas na vistoria — multi-select.</summary>
-    public enum Motivacao
-    {
-        DESABAMENTO_PARCIAL,
-        DESABAMENTO_TOTAL,
-        DESPRENDIMENTO_DE_REBOCO,
-        ENCOSTA,
-        INFILTRACAO,
-        LANCAMENTO_AGUA_PLUVIAL_ESGOTO,
-        LANCAMENTO_LIXO_ENTULHO_ATERRO,
-        MOVIMENTACAO_DE_SOLO,
-        PRECARIO_INSALUBRE,
-        RACHADURAS
-    }
-
-    /// <summary>Orientações dadas ao morador — multi-select.</summary>
-    public enum Orientacao
-    {
-        CONTRATACAO_PROFISSIONAL_HABILITADO,
-        DESOCUPACAO,
-        NAO_EXPANDIR_EDIFICACAO,
-        NAO_PERMANECER_EM_CASO_DE_CHUVA,
-        NAO_PERMANECER_NO_LOCAL_ENQUANTO_HOUVER_RISCO,
-        PROCURAR_ABRIGO,
-        REALIZAR_CAPTACAO_AGUAS_PLUVIAIS,
-        REMOCAO_DO_ENTULHO,
-        SOLICITAR_NOVA_VISTORIA
-    }
+    // Os campos de seleção da vistoria (edificação, estrutura, tipo de risco, grau,
+    // áreas afetadas, interdição, remoção, motivação, orientações, caracterização)
+    // deixaram de ser enums fixos: agora são texto, com as opções fixas no frontend
+    // (enum-options.ts) e opções personalizadas no catálogo (OpcaoCampoVistoria).
 
     /// <summary>
-    /// Encaminhamentos institucionais — multi-select compartilhado entre
-    /// Vistoria (campo) e EncaminhamentoFinal (Etapa 6).
+    /// Encaminhamentos institucionais — usado pelo EncaminhamentoFinal (Etapa 6).
     /// </summary>
     public enum Encaminhamento
     {

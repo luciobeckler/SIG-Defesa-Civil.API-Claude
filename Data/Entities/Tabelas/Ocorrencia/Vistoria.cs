@@ -32,13 +32,15 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         public TimeSpan HorarioTermino { get; set; }
 
         // ── Caracterização do local ──────────────────────────────────────────────
+        // Campos de classificação armazenados como texto para aceitar opções
+        // personalizadas do catálogo (além dos valores fixos dos enums).
         public string? DescricaoDoLocal { get; set; }
 
-        /// <summary>Geomorfologia do terreno — substituiu campo de texto livre.</summary>
-        public CaracterizacaoLocal? CaracterizacaoDoLocal { get; set; }
+        /// <summary>Geomorfologia do terreno. Valor do enum CaracterizacaoLocal ou opção personalizada.</summary>
+        public string? CaracterizacaoDoLocal { get; set; }
 
-        public TipoEdificacao Edificacao { get; set; }
-        public TipoEstrutura Estrutura { get; set; }
+        public string Edificacao { get; set; } = string.Empty;
+        public string Estrutura { get; set; } = string.Empty;
 
         // ── Dados da edificação ──────────────────────────────────────────────────
         public int NumeroMoradias { get; set; }
@@ -60,35 +62,35 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         public int TotalMoradores { get; set; }
 
         // ── Classificação de risco ───────────────────────────────────────────────
-        public TipoRiscoVistoria TipoRisco { get; set; }
-        public GrauRisco GrauRiscoEncontrado { get; set; }
+        public string TipoRisco { get; set; } = string.Empty;
+        public string GrauRiscoEncontrado { get; set; } = string.Empty;
 
-        /// <summary>Multi-select: tipificações identificadas na vistoria (integer[]).</summary>
-        public List<TipificacaoOcorrencia> TipificacaoOcorrencia { get; set; } = new();
+        /// <summary>Multi-select: tipificações identificadas na vistoria (text[]).</summary>
+        public List<string> TipificacaoOcorrencia { get; set; } = new();
 
-        public RegimeOcupacaoImovel RegimeOcupacao { get; set; }
+        public string RegimeOcupacao { get; set; } = string.Empty;
 
         // ── Conclusões ───────────────────────────────────────────────────────────
-        /// <summary>Causas identificadas — multi-select (integer[]).</summary>
-        public List<Motivacao> Motivacao { get; set; } = new();
+        /// <summary>Causas identificadas — multi-select (text[]).</summary>
+        public List<string> Motivacao { get; set; } = new();
 
-        /// <summary>Áreas do imóvel/entorno afetadas — multi-select (integer[]).</summary>
-        public List<AreaAfetada> AreasAfetadas { get; set; } = new();
+        /// <summary>Áreas do imóvel/entorno afetadas — multi-select (text[]).</summary>
+        public List<string> AreasAfetadas { get; set; } = new();
 
-        public TipoInterdicao Interdicao { get; set; }
-        public TipoRemocao Remocao { get; set; }
+        public string Interdicao { get; set; } = string.Empty;
+        public string Remocao { get; set; } = string.Empty;
 
-        /// <summary>Orientações ao morador — multi-select (integer[]).</summary>
-        public List<Orientacao> Orientacoes { get; set; } = new();
+        /// <summary>Orientações ao morador — multi-select (text[]).</summary>
+        public List<string> Orientacoes { get; set; } = new();
 
         /// <summary>Observações livres registradas em campo.</summary>
         public string? Observacoes { get; set; }
 
         /// <summary>
-        /// Encaminhamentos imediatos registrados em campo — multi-select (integer[]).
-        /// Compartilha o enum <see cref="Encaminhamento"/> com o EncaminhamentoFinal.
+        /// Encaminhamentos imediatos registrados em campo — multi-select (text[]).
+        /// Aceita valores do enum <see cref="Encaminhamento"/> e opções personalizadas.
         /// </summary>
-        public List<Encaminhamento> EncaminhamentosDeCampo { get; set; } = new();
+        public List<string> EncaminhamentosDeCampo { get; set; } = new();
 
         // ── Equipe que realizou a vistoria ───────────────────────────────────────
         /// <summary>Vistoriador principal — obrigatório ao registrar a vistoria.</summary>

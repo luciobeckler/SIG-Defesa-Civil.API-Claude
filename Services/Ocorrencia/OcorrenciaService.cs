@@ -362,7 +362,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
 
                     GrauRiscoEfetivo = o.Vistorias.Any()
                         ? o.Vistorias.OrderByDescending(v => v.Numero).First().GrauRiscoEncontrado
-                        : o.AvaliacaoRisco?.GrauRiscoInicial,
+                        : (o.AvaliacaoRisco != null ? o.AvaliacaoRisco.GrauRiscoInicial.ToString() : null),
 
                     NomeVistoriador1 = o.Agendamentos
                         .OrderByDescending(a => a.Numero)
@@ -699,7 +699,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
 
                 GrauRiscoEfetivo = o.Vistorias.Any()
                     ? o.Vistorias.OrderByDescending(v => v.Numero).First().GrauRiscoEncontrado
-                    : o.AvaliacaoRisco?.GrauRiscoInicial,
+                    : (o.AvaliacaoRisco != null ? o.AvaliacaoRisco.GrauRiscoInicial.ToString() : null),
 
                 Agendamentos = o.Agendamentos
                     .OrderBy(a => a.Numero)

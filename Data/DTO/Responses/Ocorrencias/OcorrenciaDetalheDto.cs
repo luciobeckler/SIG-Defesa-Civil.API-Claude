@@ -32,8 +32,9 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         /// Regra: se houver ao menos uma vistoria presencial realizada, retorna o
         /// GrauRiscoEncontrado da vistoria de maior número; caso contrário, retorna
         /// o GrauRiscoInicial da avaliação de risco. Null se nenhuma etapa foi concluída.
+        /// Texto: pode ser um valor do enum GrauRisco ou uma opção personalizada.
         /// </summary>
-        public GrauRisco? GrauRiscoEfetivo { get; set; }
+        public string? GrauRiscoEfetivo { get; set; }
 
         // ── Etapa 3: Agendamentos de Vistoria ─────────────────────────────────────
         /// <summary>Todos os agendamentos desta ocorrência, em ordem crescente de Numero. Lista vazia antes da Etapa 3.</summary>

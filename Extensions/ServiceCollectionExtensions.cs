@@ -197,6 +197,7 @@ namespace SIG_Defesa_Civil.API.Extensions
             services.AddScoped<IDocumentoService, DocumentoService>();
             services.AddScoped<IAvaliacaoRiscoService, AvaliacaoRiscoService>();
             services.AddScoped<IVistoriaService, VistoriaService>();
+            services.AddScoped<ICatalogoVistoriaService, CatalogoVistoriaService>();
             services.AddScoped<Services.Agenda.IAgendaService, Services.Agenda.AgendaService>();
             services.AddScoped<INotificacaoService, NotificacaoService>();
             services.AddScoped<IEncaminhamentoService, EncaminhamentoService>();

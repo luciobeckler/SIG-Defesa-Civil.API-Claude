@@ -24,6 +24,7 @@ namespace SIG_Defesa_Civil.API.Data.Models
         public DbSet<Vistoria> Vistorias { get; set; }
         public DbSet<Notificado> Notificados { get; set; }
         public DbSet<EncaminhamentoFinal> EncaminhamentosFinais { get; set; }
+        public DbSet<OpcaoCampoVistoria> OpcoesCampoVistoria { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -199,15 +200,8 @@ namespace SIG_Defesa_Civil.API.Data.Models
             // ═══════════════════════════════════════════════════════════════════════
             modelBuilder.Entity<Vistoria>(entity =>
             {
-                entity.Property(v => v.Edificacao).HasConversion<string>();
-                entity.Property(v => v.Estrutura).HasConversion<string>();
-                entity.Property(v => v.TipoRisco).HasConversion<string>();
-                entity.Property(v => v.GrauRiscoEncontrado).HasConversion<string>();
-                entity.Property(v => v.TipificacaoOcorrencia).HasConversion<string>();
-                entity.Property(v => v.RegimeOcupacao).HasConversion<string>();
-                entity.Property(v => v.AreasAfetadas).HasConversion<string>();
-                entity.Property(v => v.Interdicao).HasConversion<string>();
-                entity.Property(v => v.Remocao).HasConversion<string>();
+                // Campos de classificação são texto (single → text, multi → text[]),
+                // permitindo opções personalizadas do catálogo além dos enums fixos.
 
                 entity.HasOne(v => v.Ocorrencia)
                     .WithMany(o => o.Vistorias)
@@ -229,6 +223,19 @@ namespace SIG_Defesa_Civil.API.Data.Models
 
                 // Garante que o número da vistoria é único por ocorrência
                 entity.HasIndex(v => new { v.OcorrenciaId, v.Numero }).IsUnique();
+            });
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // CATÁLOGO DE OPÇÕES PERSONALIZADAS DOS CAMPOS DE VISTORIA
+            // ═══════════════════════════════════════════════════════════════════════
+            modelBuilder.Entity<OpcaoCampoVistoria>(entity =>
+            {
+                entity.Property(o => o.Campo).HasMaxLength(50);
+                entity.Property(o => o.Valor).HasMaxLength(200);
+                entity.Property(o => o.Label).HasMaxLength(200);
+
+                // Não permite a mesma opção duplicada no mesmo campo
+                entity.HasIndex(o => new { o.Campo, o.Valor }).IsUnique();
             });
 
             // ═══════════════════════════════════════════════════════════════════════
