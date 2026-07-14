@@ -35,8 +35,7 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         public int? RelatorioVistoriaId { get; set; }
         public Arquivo? RelatorioVistoria { get; set; }
 
-        // ── Entrega ao solicitante ───────────────────────────────────────────────
-        public CanalEntregaRelatorio EntregaRelatorio { get; set; }
+        // A entrega do relatório ao solicitante é sempre por e-mail — não há canal configurável.
 
         // ── Auditoria ────────────────────────────────────────────────────────────
         public int RegistradoPorId { get; set; }

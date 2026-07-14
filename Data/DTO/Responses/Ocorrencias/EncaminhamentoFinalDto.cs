@@ -18,8 +18,6 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         /// <summary>Metadados do relatório anexado (se houver).</summary>
         public DocumentoVisualizacao? RelatorioVistoria { get; set; }
 
-        public CanalEntregaRelatorio EntregaRelatorio { get; set; }
-
         public string RegistradoPor { get; set; } = string.Empty;
         public DateTime RegistradoEm { get; set; }
         public DateTime AtualizadoEm { get; set; }

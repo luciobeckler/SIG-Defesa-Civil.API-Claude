@@ -10,16 +10,37 @@ namespace SIG_Defesa_Civil.API.Services.Storage
     public interface IStorageService
     {
         /// <summary>
-        /// Cria a estrutura de pastas para uma ocorrência no armazenamento.
-        /// Estrutura gerada:
-        ///   {BasePath}/{YYYY-XXXX}/Documentos/
-        ///   {BasePath}/{YYYY-XXXX}/Fotos/Fotos_do_Municipe/
-        ///   {BasePath}/{YYYY-XXXX}/Fotos/Fotos_da_Vistoria/
+        /// Cria a estrutura de pastas para uma ocorrência no armazenamento,
+        /// espelhando as categorias da Central de Documentos (ver <see cref="PastasArquivo"/>):
+        ///   {BasePath}/{Protocolo}/Fotos_do_Cidadao/ … /Relatorios_Assinados/ etc.
         /// </summary>
         /// <param name="protocolo">Protocolo da ocorrência (ex: 2026-0001)</param>
         /// <returns>Caminho absoluto da pasta raiz do protocolo</returns>
         /// <exception cref="StorageException">Se houver falha ao criar pastas (permissão, disco cheio, etc)</exception>
         Task<string> CriarEstruturaPastasAsync(string protocolo);
+
+        /// <summary>
+        /// Salva um arquivo em uma pasta arbitrária da ocorrência (pastas
+        /// personalizadas criadas pelo usuário na Central de Documentos, ex.: "Retorno").
+        /// </summary>
+        /// <returns>Caminho relativo do arquivo salvo (ex: /2026-0001/Retorno/doc.pdf)</returns>
+        Task<string> SalvarArquivoEmPastaAsync(
+            string protocolo,
+            string pasta,
+            string nomeArquivo,
+            Stream stream);
+
+        /// <summary>
+        /// Cria uma pasta personalizada dentro da ocorrência (idempotente).
+        /// </summary>
+        Task CriarPastaAsync(string protocolo, string pasta);
+
+        /// <summary>
+        /// Lista as pastas existentes de uma ocorrência no armazenamento
+        /// (padrão + personalizadas). Implementações sem conceito de diretório
+        /// (ex.: S3) podem retornar apenas as pastas padrão.
+        /// </summary>
+        Task<List<string>> ListarPastasAsync(string protocolo);
 
         /// <summary>
         /// Salva um arquivo no armazenamento e retorna o caminho relativo.

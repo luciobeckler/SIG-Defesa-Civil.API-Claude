@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIG_Defesa_Civil.API.Data.Models;
@@ -12,9 +13,11 @@ using SIG_Defesa_Civil.API.Data.Models;
 namespace SIG_Defesa_Civil.API.Migrations
 {
     [DbContext(typeof(DefesaCivilContext))]
-    partial class DefesaCivilContextModelSnapshot : ModelSnapshot
+    [Migration("20260710110926_EquipeVistoriaQuatroPessoas")]
+    partial class EquipeVistoriaQuatroPessoas
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -88,6 +91,10 @@ namespace SIG_Defesa_Civil.API.Migrations
                         .IsRequired()
                         .HasColumnType("integer[]");
 
+                    b.Property<string>("EntregaRelatorio")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<int>("OcorrenciaId")
                         .HasColumnType("integer");
 
@@ -125,10 +132,6 @@ namespace SIG_Defesa_Civil.API.Migrations
 
                     b.Property<DateOnly>("DataNotificacao")
                         .HasColumnType("date");
-
-                    b.Property<string>("FormaRecebimento")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<string>("Nome")
                         .IsRequired()

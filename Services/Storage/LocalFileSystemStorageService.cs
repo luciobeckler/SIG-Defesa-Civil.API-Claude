@@ -20,16 +20,11 @@ namespace SIG_Defesa_Civil.API.Services.Storage
 
         public async Task<string> CriarEstruturaPastasAsync(string protocolo)
         {
-            // Cria as três folhas da árvore de armazenamento:
-            //   [Protocolo]/Documentos/
-            //   [Protocolo]/Fotos/Fotos_do_Municipe/
-            //   [Protocolo]/Fotos/Fotos_da_Vistoria/
-            var pastas = new[]
-            {
-                Path.Combine(_settings.BasePath, protocolo, _settings.SubPastaDocumentos),
-                Path.Combine(_settings.BasePath, protocolo, _settings.SubPastaFotosMunicipe),
-                Path.Combine(_settings.BasePath, protocolo, _settings.SubPastaFotosVistoria),
-            };
+            // Estrutura espelhando as categorias da Central de Documentos:
+            //   [Protocolo]/Fotos_do_Cidadao/ … [Protocolo]/Relatorios_Assinados/ etc.
+            var pastas = PastasArquivo.Padrao
+                .Select(p => Path.Combine(_settings.BasePath, protocolo, p))
+                .ToArray();
 
             var pastaRaiz = Path.Combine(_settings.BasePath, protocolo);
 
@@ -71,17 +66,10 @@ namespace SIG_Defesa_Civil.API.Services.Storage
         }
 
         /// <summary>
-        /// Determina a subpasta de destino com base no tipo do arquivo:
-        ///   COMPROVANTE_RESIDENCIA | FICHA_VISTORIA | RELATORIO_FINAL → Documentos
-        ///   FOTO_CIDADAO                                               → Fotos/Fotos_do_Municipe
-        ///   FOTO_CAMPO                                                 → Fotos/Fotos_da_Vistoria
+        /// Cada tipo de arquivo tem sua própria pasta, espelhando as categorias
+        /// da Central de Documentos (ver <see cref="PastasArquivo"/>).
         /// </summary>
-        private string ObterSubPasta(TipoArquivo tipoArquivo) => tipoArquivo switch
-        {
-            TipoArquivo.FOTO_CIDADAO   => _settings.SubPastaFotosMunicipe,
-            TipoArquivo.FOTO_CAMPO     => _settings.SubPastaFotosVistoria,
-            _                          => _settings.SubPastaDocumentos,   // COMPROVANTE, FICHA, RELATORIO
-        };
+        private static string ObterSubPasta(TipoArquivo tipoArquivo) => PastasArquivo.De(tipoArquivo);
 
         public async Task<string> SalvarArquivoAsync(
             string protocolo,
@@ -159,6 +147,79 @@ namespace SIG_Defesa_Civil.API.Services.Storage
             }
 
             return caminhos;
+        }
+
+        public async Task<string> SalvarArquivoEmPastaAsync(
+            string protocolo,
+            string pasta,
+            string nomeArquivo,
+            Stream stream)
+        {
+            var pastaSegura = PastasArquivo.SanitizarNome(pasta);
+            var caminhoRelativo = $"/{protocolo}/{pastaSegura}/{nomeArquivo}";
+            var caminhoAbsoluto = ObterCaminhoAbsoluto(caminhoRelativo);
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(caminhoAbsoluto)!);
+
+                await using var fileStream = new FileStream(
+                    caminhoAbsoluto, FileMode.Create, FileAccess.Write, FileShare.None,
+                    bufferSize: 81920, useAsync: true);
+                await stream.CopyToAsync(fileStream);
+
+                _logger.LogInformation("Arquivo salvo em pasta personalizada: {Caminho}", caminhoRelativo);
+                return caminhoRelativo;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                throw new StorageException(
+                    $"Sem permissão para gravar arquivo: {caminhoAbsoluto}",
+                    caminhoAbsoluto, StorageErrorType.PermissaoNegada);
+            }
+            catch (IOException ex) when (IsDiskFull(ex))
+            {
+                throw new StorageException(
+                    "Espaço em disco insuficiente para salvar o arquivo",
+                    caminhoAbsoluto, StorageErrorType.DiscoLotado);
+            }
+            catch (IOException ex)
+            {
+                throw new StorageException(
+                    $"Erro de I/O ao gravar arquivo: {caminhoAbsoluto}",
+                    ex, StorageErrorType.ErroLeituraEscrita);
+            }
+        }
+
+        public Task CriarPastaAsync(string protocolo, string pasta)
+        {
+            var pastaSegura = PastasArquivo.SanitizarNome(pasta);
+            var caminho = Path.Combine(_settings.BasePath, protocolo, pastaSegura);
+            try
+            {
+                Directory.CreateDirectory(caminho);
+                _logger.LogInformation("Pasta criada para {Protocolo}: {Pasta}", protocolo, pastaSegura);
+                return Task.CompletedTask;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                throw new StorageException(
+                    $"Sem permissão para criar pasta: {caminho}",
+                    caminho, StorageErrorType.PermissaoNegada);
+            }
+        }
+
+        public Task<List<string>> ListarPastasAsync(string protocolo)
+        {
+            var raiz = Path.Combine(_settings.BasePath, protocolo);
+            if (!Directory.Exists(raiz))
+                return Task.FromResult(new List<string>());
+
+            var pastas = Directory.GetDirectories(raiz)
+                .Select(d => Path.GetFileName(d)!)
+                .OrderBy(p => p)
+                .ToList();
+            return Task.FromResult(pastas);
         }
 
         public string ObterCaminhoAbsoluto(string caminhoRelativo)

@@ -14,5 +14,11 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
 
         /// <summary>Segundo vistoriador (opcional).</summary>
         public int? Vistoriador2Id { get; set; }
+
+        /// <summary>Terceiro vistoriador (opcional) — equipes de até 4 pessoas.</summary>
+        public int? Vistoriador3Id { get; set; }
+
+        /// <summary>Quarto vistoriador (opcional).</summary>
+        public int? Vistoriador4Id { get; set; }
     }
 }

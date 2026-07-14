@@ -4,15 +4,15 @@ using SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias;
 namespace SIG_Defesa_Civil.API.Services.Notificacao
 {
     /// <summary>
-    /// Gerencia os notificados da ocorrência — Etapa 5 do fluxo.
-    /// Relacionamento 1:N: uma ocorrência pode ter múltiplos notificados.
-    /// Ao registrar pelo menos um notificado, o status avança para NOTIFICADA.
+    /// Gerencia os notificados da ocorrência — quem recebeu o relatório.
+    /// Propriedade da ocorrência (não é etapa): pode ser registrada a qualquer
+    /// momento e não altera o status do fluxo.
     /// </summary>
     public interface INotificacaoService
     {
         /// <summary>
-        /// Registra um ou mais notificados para a ocorrência.
-        /// Pré-condição: ocorrência deve estar em VISTORIA_REALIZADA.
+        /// Registra um ou mais notificados (recebedores do relatório).
+        /// Permitido em qualquer status, exceto CANCELADA.
         /// </summary>
         Task<List<NotificadoDto>> RegistrarAsync(
             int ocorrenciaId,
@@ -26,8 +26,14 @@ namespace SIG_Defesa_Civil.API.Services.Notificacao
 
         /// <summary>
         /// Remove um notificado específico (deleção física — notificados não têm soft-delete próprio).
-        /// A ocorrência retorna ao status VISTORIA_REALIZADA se não restar nenhum notificado.
         /// </summary>
         Task RemoverNotificadoAsync(int notificadoId, int usuarioId);
+
+        /// <summary>
+        /// Salva a assinatura do notificado (PNG do canvas) — obrigatória quando o
+        /// recebimento do relatório é PRESENCIAL. Substitui assinatura anterior.
+        /// </summary>
+        Task SalvarAssinaturaNotificadoAsync(
+            int ocorrenciaId, int notificadoId, IFormFile arquivo, int usuarioId);
     }
 }

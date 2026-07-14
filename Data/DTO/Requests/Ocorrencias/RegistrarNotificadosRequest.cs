@@ -1,10 +1,12 @@
+using SIG_Defesa_Civil.API.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
 {
     /// <summary>
-    /// Registro dos notificados da ocorrência — Etapa 5.
-    /// Ao registrar pelo menos um notificado, o status avança para NOTIFICADA.
+    /// Registro de quem recebeu o relatório da ocorrência (notificados).
+    /// Propriedade da ocorrência — pode ser registrado a qualquer momento,
+    /// sem alterar o status do fluxo.
     /// </summary>
     public class RegistrarNotificadosRequest
     {
@@ -23,5 +25,11 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
         public string? RgCpf { get; set; }
 
         [Required] public DateOnly DataNotificacao { get; set; }
+
+        /// <summary>
+        /// Como o relatório foi recebido (EMAIL ou PRESENCIAL).
+        /// PRESENCIAL exige a coleta da assinatura do notificado em seguida.
+        /// </summary>
+        public FormaRecebimentoRelatorio FormaRecebimento { get; set; } = FormaRecebimentoRelatorio.EMAIL;
     }
 }

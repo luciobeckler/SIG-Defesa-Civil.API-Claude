@@ -23,6 +23,6 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
         /// </summary>
         public int? RelatorioVistoriaId { get; set; }
 
-        [Required] public CanalEntregaRelatorio EntregaRelatorio { get; set; }
+        // A entrega do relatório é sempre por e-mail — o canal deixou de ser configurável.
     }
 }

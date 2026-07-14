@@ -29,10 +29,13 @@ namespace SIG_Defesa_Civil.API.Services.Encaminhamento
                 .FirstOrDefaultAsync(o => o.Id == ocorrenciaId)
                 ?? throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
 
-            if (ocorrencia.Status != StatusOcorrencia.NOTIFICADA)
+            // Notificados são opcionais: o encerramento é permitido tanto a partir
+            // de NOTIFICADA quanto diretamente de VISTORIA_REALIZADA.
+            if (ocorrencia.Status != StatusOcorrencia.NOTIFICADA &&
+                ocorrencia.Status != StatusOcorrencia.VISTORIA_REALIZADA)
                 throw new InvalidOperationException(
-                    $"O encaminhamento final só pode ser registrado quando a ocorrência está NOTIFICADA. " +
-                    $"Status atual: {ocorrencia.Status}.");
+                    $"O encaminhamento final só pode ser registrado quando a ocorrência está " +
+                    $"VISTORIA_REALIZADA ou NOTIFICADA. Status atual: {ocorrencia.Status}.");
 
             var jaExiste = await _context.EncaminhamentosFinais.AnyAsync(e => e.OcorrenciaId == ocorrenciaId);
             if (jaExiste)
@@ -48,7 +51,6 @@ namespace SIG_Defesa_Civil.API.Services.Encaminhamento
                 Encaminhamentos = request.Encaminhamentos,
                 RetornoEncaminhamentos = request.RetornoEncaminhamentos,
                 RelatorioVistoriaId = request.RelatorioVistoriaId,
-                EntregaRelatorio = request.EntregaRelatorio,
                 RegistradoPorId = usuarioId,
                 RegistradoEm = DateTime.UtcNow,
                 AtualizadoEm = DateTime.UtcNow
@@ -97,7 +99,6 @@ namespace SIG_Defesa_Civil.API.Services.Encaminhamento
             encaminhamento.Encaminhamentos = request.Encaminhamentos;
             encaminhamento.RetornoEncaminhamentos = request.RetornoEncaminhamentos;
             encaminhamento.RelatorioVistoriaId = request.RelatorioVistoriaId;
-            encaminhamento.EntregaRelatorio = request.EntregaRelatorio;
             encaminhamento.AtualizadoEm = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -141,7 +142,8 @@ namespace SIG_Defesa_Civil.API.Services.Encaminhamento
                 ?? throw new InvalidOperationException(
                     $"Ocorrência {ocorrenciaId} não encontrada ou não está ENCERRADA.");
 
-            ocorrencia.Status = StatusOcorrencia.NOTIFICADA;
+            // Notificados deixaram de ser etapa: a reabertura volta ao estado pré-encerramento
+            ocorrencia.Status = StatusOcorrencia.VISTORIA_REALIZADA;
             ocorrencia.AtualizadoEm = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -178,7 +180,6 @@ namespace SIG_Defesa_Civil.API.Services.Encaminhamento
             Id = e.Id,
             Encaminhamentos = e.Encaminhamentos,
             RetornoEncaminhamentos = e.RetornoEncaminhamentos,
-            EntregaRelatorio = e.EntregaRelatorio,
             RegistradoPor = e.RegistradoPor.Nome,
             RegistradoEm = e.RegistradoEm,
             AtualizadoEm = e.AtualizadoEm,

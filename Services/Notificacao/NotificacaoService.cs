@@ -3,18 +3,25 @@ using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia;
 using SIG_Defesa_Civil.API.Data.Models;
+using SIG_Defesa_Civil.API.Data.Models.Tabelas;
 using SIG_Defesa_Civil.API.Enums;
+using SIG_Defesa_Civil.API.Services.Storage;
 
 namespace SIG_Defesa_Civil.API.Services.Notificacao
 {
     public class NotificacaoService : INotificacaoService
     {
         private readonly DefesaCivilContext _context;
+        private readonly IStorageService _storageService;
         private readonly ILogger<NotificacaoService> _logger;
 
-        public NotificacaoService(DefesaCivilContext context, ILogger<NotificacaoService> logger)
+        public NotificacaoService(
+            DefesaCivilContext context,
+            IStorageService storageService,
+            ILogger<NotificacaoService> logger)
         {
             _context = context;
+            _storageService = storageService;
             _logger = logger;
         }
 
@@ -28,11 +35,11 @@ namespace SIG_Defesa_Civil.API.Services.Notificacao
                 .FirstOrDefaultAsync(o => o.Id == ocorrenciaId)
                 ?? throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
 
-            if (ocorrencia.Status != StatusOcorrencia.VISTORIA_REALIZADA &&
-                ocorrencia.Status != StatusOcorrencia.NOTIFICADA)
+            // Notificados são uma propriedade da ocorrência (quem recebeu o relatório),
+            // não uma etapa: podem ser registrados a qualquer momento e não alteram o status.
+            if (ocorrencia.Status == StatusOcorrencia.CANCELADA)
                 throw new InvalidOperationException(
-                    $"Os notificados só podem ser registrados quando a ocorrência está em " +
-                    $"VISTORIA_REALIZADA ou NOTIFICADA. Status atual: {ocorrencia.Status}.");
+                    "Não é possível registrar notificados em uma ocorrência cancelada.");
 
             var novosNotificados = request.Notificados.Select(item => new Notificado
             {
@@ -40,22 +47,19 @@ namespace SIG_Defesa_Civil.API.Services.Notificacao
                 Nome = item.Nome,
                 RgCpf = item.RgCpf,
                 DataNotificacao = item.DataNotificacao,
+                FormaRecebimento = item.FormaRecebimento,
                 RegistradoPorId = usuarioId,
                 RegistradoEm = DateTime.UtcNow
             }).ToList();
 
             _context.Notificados.AddRange(novosNotificados);
 
-            if (ocorrencia.Status == StatusOcorrencia.VISTORIA_REALIZADA)
-            {
-                ocorrencia.Status = StatusOcorrencia.NOTIFICADA;
-                ocorrencia.AtualizadoEm = DateTime.UtcNow;
-            }
+            ocorrencia.AtualizadoEm = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
-                "{Count} notificado(s) registrado(s) para ocorrência {Protocolo} → status NOTIFICADA",
+                "{Count} notificado(s) registrado(s) para ocorrência {Protocolo}",
                 novosNotificados.Count, ocorrencia.Protocolo);
 
             // Recarregar com navegação
@@ -87,18 +91,64 @@ namespace SIG_Defesa_Civil.API.Services.Notificacao
             _context.Notificados.Remove(notificado);
             await _context.SaveChangesAsync();
 
-            // Se não há mais notificados, reverter status para VISTORIA_REALIZADA
-            var aindarestam = await _context.Notificados.AnyAsync(n => n.OcorrenciaId == ocorrencia.Id);
-            if (!aindarestam && ocorrencia.Status == StatusOcorrencia.NOTIFICADA)
-            {
-                ocorrencia.Status = StatusOcorrencia.VISTORIA_REALIZADA;
-                ocorrencia.AtualizadoEm = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
+            _logger.LogInformation(
+                "Notificado {NotificadoId} removido da ocorrência {Protocolo} pelo usuário {UsuarioId}",
+                notificadoId, ocorrencia.Protocolo, usuarioId);
+        }
 
-                _logger.LogInformation(
-                    "Último notificado removido. Ocorrência {Protocolo} revertida para VISTORIA_REALIZADA",
-                    ocorrencia.Protocolo);
+        public async Task SalvarAssinaturaNotificadoAsync(
+            int ocorrenciaId, int notificadoId, IFormFile arquivo, int usuarioId)
+        {
+            var notificado = await _context.Notificados
+                .Include(n => n.Ocorrencia)
+                .FirstOrDefaultAsync(n => n.Id == notificadoId && n.OcorrenciaId == ocorrenciaId)
+                ?? throw new InvalidOperationException(
+                    $"Notificado {notificadoId} não encontrado para a ocorrência {ocorrenciaId}.");
+
+            var protocolo = notificado.Ocorrencia.Protocolo;
+
+            // Nome determinístico: uma assinatura por notificado (substituição)
+            var nomeArquivo = $"assinatura_notificado_{notificadoId}.png";
+
+            var ms = new MemoryStream();
+            await arquivo.CopyToAsync(ms);
+            ms.Position = 0;
+
+            string caminho;
+            try
+            {
+                await _storageService.CriarEstruturaPastasAsync(protocolo);
+                caminho = await _storageService.SalvarArquivoAsync(
+                    protocolo, nomeArquivo, TipoArquivo.ASSINATURA_MUNICIPIO, ms);
             }
+            finally
+            {
+                await ms.DisposeAsync();
+            }
+
+            var anterior = await _context.Arquivos.FirstOrDefaultAsync(a =>
+                a.OcorrenciaId == ocorrenciaId &&
+                a.TipoArquivo  == TipoArquivo.ASSINATURA_MUNICIPIO.ToString() &&
+                a.NomeOriginal == nomeArquivo);
+            if (anterior != null)
+                _context.Arquivos.Remove(anterior);
+
+            _context.Arquivos.Add(new Arquivo
+            {
+                OcorrenciaId     = ocorrenciaId,
+                NomeOriginal     = nomeArquivo,
+                TipoArquivo      = TipoArquivo.ASSINATURA_MUNICIPIO.ToString(),
+                CaminhoRelativo  = caminho,
+                TamanhoBytes     = arquivo.Length,
+                EnviadoPorUserId = usuarioId,
+                EnviadoEm        = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Assinatura do notificado {NotificadoId} salva para ocorrência {Protocolo}",
+                notificadoId, protocolo);
         }
 
         // ── Helper ───────────────────────────────────────────────────────────────
@@ -109,6 +159,7 @@ namespace SIG_Defesa_Civil.API.Services.Notificacao
             Nome = n.Nome,
             RgCpf = n.RgCpf,
             DataNotificacao = n.DataNotificacao,
+            FormaRecebimento = n.FormaRecebimento.ToString(),
             RegistradoPor = n.RegistradoPor.Nome,
             RegistradoEm = n.RegistradoEm
         };

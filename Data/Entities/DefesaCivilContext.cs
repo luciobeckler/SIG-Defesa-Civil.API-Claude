@@ -172,6 +172,16 @@ namespace SIG_Defesa_Civil.API.Data.Models
                     .HasForeignKey(a => a.Vistoriador2Id)
                     .OnDelete(DeleteBehavior.SetNull);
 
+                entity.HasOne(a => a.Vistoriador3)
+                    .WithMany()
+                    .HasForeignKey(a => a.Vistoriador3Id)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(a => a.Vistoriador4)
+                    .WithMany()
+                    .HasForeignKey(a => a.Vistoriador4Id)
+                    .OnDelete(DeleteBehavior.SetNull);
+
                 entity.HasOne(a => a.AgendadoPor)
                     .WithMany()
                     .HasForeignKey(a => a.AgendadoPorId)
@@ -243,6 +253,8 @@ namespace SIG_Defesa_Civil.API.Data.Models
             // ═══════════════════════════════════════════════════════════════════════
             modelBuilder.Entity<Notificado>(entity =>
             {
+                entity.Property(n => n.FormaRecebimento).HasConversion<string>();
+
                 entity.HasOne(n => n.Ocorrencia)
                     .WithMany(o => o.Notificados)
                     .HasForeignKey(n => n.OcorrenciaId)
@@ -259,7 +271,6 @@ namespace SIG_Defesa_Civil.API.Data.Models
             // ═══════════════════════════════════════════════════════════════════════
             modelBuilder.Entity<EncaminhamentoFinal>(entity =>
             {
-                entity.Property(e => e.EntregaRelatorio).HasConversion<string>();
 
                 entity.HasOne(e => e.Ocorrencia)
                     .WithOne(o => o.EncaminhamentoFinal)

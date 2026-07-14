@@ -170,6 +170,8 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 .Include(o => o.AvaliacaoRisco).ThenInclude(a => a!.AbertaPorUsuario)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador2)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador3)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador4)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.AgendadoPor)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Tentativas)
                 .Include(o => o.Vistorias).ThenInclude(v => v.RegistradoPor)
@@ -287,6 +289,8 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 .Include(o => o.AvaliacaoRisco).ThenInclude(a => a!.AbertaPorUsuario)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador2)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador3)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador4)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.AgendadoPor)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Tentativas)
                 .Include(o => o.Vistorias).ThenInclude(v => v.RegistradoPor)
@@ -607,6 +611,213 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
+        // CENTRAL DE DOCUMENTOS — pastas e uploads
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        public async Task<List<string>> ListarPastasAsync(int ocorrenciaId)
+        {
+            var ocorrencia = await _context.Ocorrencias
+                .FirstOrDefaultAsync(o => o.Id == ocorrenciaId && o.DeletedAt == null)
+                ?? throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
+
+            // União: pastas padrão + pastas físicas no storage + categorias custom no banco
+            var pastas = new List<string>(Services.Storage.PastasArquivo.Padrao);
+
+            var fisicas = await _storageService.ListarPastasAsync(ocorrencia.Protocolo);
+            foreach (var p in fisicas)
+                if (!pastas.Contains(p)) pastas.Add(p);
+
+            var tiposNoBanco = await _context.Arquivos
+                .Where(a => a.OcorrenciaId == ocorrenciaId)
+                .Select(a => a.TipoArquivo)
+                .Distinct()
+                .ToListAsync();
+            foreach (var t in tiposNoBanco)
+                if (!Enum.TryParse<TipoArquivo>(t, out _) && !pastas.Contains(t))
+                    pastas.Add(t);
+
+            return pastas;
+        }
+
+        public async Task<List<string>> CriarPastaAsync(int ocorrenciaId, string nome, int usuarioId)
+        {
+            var ocorrencia = await _context.Ocorrencias
+                .FirstOrDefaultAsync(o => o.Id == ocorrenciaId && o.DeletedAt == null)
+                ?? throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
+
+            var nomeSeguro = Services.Storage.PastasArquivo.SanitizarNome(nome);
+
+            if (Services.Storage.PastasArquivo.Padrao.Contains(nomeSeguro, StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"'{nomeSeguro}' já é uma pasta padrão da ocorrência.");
+
+            await _storageService.CriarEstruturaPastasAsync(ocorrencia.Protocolo);
+            await _storageService.CriarPastaAsync(ocorrencia.Protocolo, nomeSeguro);
+
+            _logger.LogInformation(
+                "Pasta '{Pasta}' criada para ocorrência {Protocolo} pelo usuário {UsuarioId}",
+                nomeSeguro, ocorrencia.Protocolo, usuarioId);
+
+            return await ListarPastasAsync(ocorrenciaId);
+        }
+
+        public async Task<int> AdicionarArquivosAsync(
+            int ocorrenciaId, string pasta, List<IFormFile> arquivos, int usuarioId)
+        {
+            var ocorrencia = await _context.Ocorrencias
+                .FirstOrDefaultAsync(o => o.Id == ocorrenciaId && o.DeletedAt == null)
+                ?? throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
+
+            // Pasta padrão → grava com o TipoArquivo correspondente;
+            // pasta personalizada → o nome sanitizado vira a categoria.
+            var tipoPadrao = Services.Storage.PastasArquivo.PorTipo
+                .FirstOrDefault(kv => kv.Value.Equals(
+                    Services.Storage.PastasArquivo.SanitizarNome(pasta), StringComparison.OrdinalIgnoreCase));
+            var ehPadrao = tipoPadrao.Value != null;
+            var categoria = ehPadrao
+                ? tipoPadrao.Key.ToString()
+                : Services.Storage.PastasArquivo.SanitizarNome(pasta);
+
+            await _storageService.CriarEstruturaPastasAsync(ocorrencia.Protocolo);
+
+            var total = 0;
+            foreach (var arquivo in arquivos)
+            {
+                var extensao = Path.GetExtension(arquivo.FileName);
+                var nomeUnico = $"{categoria}_{Guid.NewGuid()}{extensao}";
+
+                var ms = new MemoryStream();
+                await arquivo.CopyToAsync(ms);
+                ms.Position = 0;
+
+                string caminho;
+                try
+                {
+                    caminho = ehPadrao
+                        ? await _storageService.SalvarArquivoAsync(
+                            ocorrencia.Protocolo, nomeUnico, tipoPadrao.Key, ms)
+                        : await _storageService.SalvarArquivoEmPastaAsync(
+                            ocorrencia.Protocolo, categoria, nomeUnico, ms);
+                }
+                finally
+                {
+                    await ms.DisposeAsync();
+                }
+
+                _context.Arquivos.Add(new Arquivo
+                {
+                    OcorrenciaId     = ocorrenciaId,
+                    NomeOriginal     = arquivo.FileName,
+                    TipoArquivo      = categoria,
+                    CaminhoRelativo  = caminho,
+                    TamanhoBytes     = arquivo.Length,
+                    EnviadoPorUserId = usuarioId,
+                    EnviadoEm        = DateTime.UtcNow,
+                });
+                total++;
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "{Count} arquivo(s) adicionados à pasta '{Pasta}' da ocorrência {Protocolo}",
+                total, categoria, ocorrencia.Protocolo);
+
+            return total;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // RETORNO DO RELATÓRIO ASSINADO / ACOMPANHAMENTO
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        public async Task SalvarRelatorioAssinadoAsync(int ocorrenciaId, IFormFile arquivo, int usuarioId)
+        {
+            var ocorrencia = await _context.Ocorrencias
+                .FirstOrDefaultAsync(o => o.Id == ocorrenciaId && o.DeletedAt == null)
+                ?? throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
+
+            // Nome determinístico: um relatório assinado por ocorrência (substituição)
+            var nomeArquivo = $"relatorio_assinado_{ocorrenciaId}.pdf";
+
+            var ms = new MemoryStream();
+            await arquivo.CopyToAsync(ms);
+            ms.Position = 0;
+
+            string caminho;
+            try
+            {
+                await _storageService.CriarEstruturaPastasAsync(ocorrencia.Protocolo);
+                caminho = await _storageService.SalvarArquivoAsync(
+                    ocorrencia.Protocolo, nomeArquivo, TipoArquivo.RELATORIO_ASSINADO, ms);
+            }
+            finally
+            {
+                await ms.DisposeAsync();
+            }
+
+            var anterior = await _context.Arquivos.FirstOrDefaultAsync(a =>
+                a.OcorrenciaId == ocorrenciaId &&
+                a.TipoArquivo  == TipoArquivo.RELATORIO_ASSINADO.ToString() &&
+                a.NomeOriginal == nomeArquivo);
+            if (anterior != null)
+                _context.Arquivos.Remove(anterior);
+
+            _context.Arquivos.Add(new Arquivo
+            {
+                OcorrenciaId     = ocorrenciaId,
+                NomeOriginal     = nomeArquivo,
+                TipoArquivo      = TipoArquivo.RELATORIO_ASSINADO.ToString(),
+                CaminhoRelativo  = caminho,
+                TamanhoBytes     = arquivo.Length,
+                EnviadoPorUserId = usuarioId,
+                EnviadoEm        = DateTime.UtcNow,
+            });
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Relatório assinado (PDF) salvo para ocorrência {Protocolo} pelo usuário {UsuarioId}",
+                ocorrencia.Protocolo, usuarioId);
+        }
+
+        public async Task<(Stream Conteudo, string Nome, string ContentType)?> ObterRelatorioAcompanhamentoAsync(
+            string protocolo, string cpf)
+        {
+            var cpfNormalizado = new string(cpf.Where(char.IsDigit).ToArray());
+
+            var ocorrencia = await _context.Ocorrencias
+                .Include(o => o.Solicitante)
+                .Include(o => o.Arquivos)
+                .Where(o => o.DeletedAt == null)
+                .FirstOrDefaultAsync(o => o.Protocolo == protocolo)
+                ?? throw new InvalidOperationException($"Protocolo '{protocolo}' não encontrado.");
+
+            var cpfSolicitante = new string((ocorrencia.Solicitante?.Cpf ?? "").Where(char.IsDigit).ToArray());
+            if (cpfSolicitante != cpfNormalizado)
+                throw new UnauthorizedAccessException(
+                    "O CPF informado não corresponde ao solicitante desta ocorrência.");
+
+            // Prefere o PDF assinado; sem ele, cai para o relatório final gerado (.docx)
+            var arquivo = ocorrencia.Arquivos
+                .Where(a => a.TipoArquivo == TipoArquivo.RELATORIO_ASSINADO.ToString())
+                .OrderByDescending(a => a.EnviadoEm)
+                .FirstOrDefault()
+                ?? ocorrencia.Arquivos
+                .Where(a => a.TipoArquivo == TipoArquivo.RELATORIO_FINAL.ToString())
+                .OrderByDescending(a => a.EnviadoEm)
+                .FirstOrDefault();
+
+            if (arquivo == null)
+                return null;
+
+            var stream = await _storageService.LerArquivoAsync(arquivo.CaminhoRelativo);
+            var contentType = arquivo.NomeOriginal.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+                ? "application/pdf"
+                : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+            return (stream, $"relatorio_{protocolo}{Path.GetExtension(arquivo.NomeOriginal)}", contentType);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
         // HELPERS PRIVADOS
         // ═══════════════════════════════════════════════════════════════════════════
 
@@ -716,6 +927,12 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         Vistoriador2Id = a.Vistoriador2Id,
                         NomeVistoriador2 = a.Vistoriador2?.Nome,
                         MatriculaVistoriador2 = a.Vistoriador2?.Matricula,
+                        Vistoriador3Id = a.Vistoriador3Id,
+                        NomeVistoriador3 = a.Vistoriador3?.Nome,
+                        MatriculaVistoriador3 = a.Vistoriador3?.Matricula,
+                        Vistoriador4Id = a.Vistoriador4Id,
+                        NomeVistoriador4 = a.Vistoriador4?.Nome,
+                        MatriculaVistoriador4 = a.Vistoriador4?.Matricula,
                         AgendadoPor = a.AgendadoPor.Nome,
                         AgendadoEm = a.AgendadoEm,
                         Tentativas = a.Tentativas
@@ -774,6 +991,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     Nome = n.Nome,
                     RgCpf = n.RgCpf,
                     DataNotificacao = n.DataNotificacao,
+                    FormaRecebimento = n.FormaRecebimento.ToString(),
                     RegistradoPor = n.RegistradoPor.Nome,
                     RegistradoEm = n.RegistradoEm
                 }).ToList(),
@@ -783,7 +1001,6 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     Id = o.EncaminhamentoFinal.Id,
                     Encaminhamentos = o.EncaminhamentoFinal.Encaminhamentos,
                     RetornoEncaminhamentos = o.EncaminhamentoFinal.RetornoEncaminhamentos,
-                    EntregaRelatorio = o.EncaminhamentoFinal.EntregaRelatorio,
                     RelatorioVistoria = o.EncaminhamentoFinal.RelatorioVistoria == null ? null : new DocumentoVisualizacao
                     {
                         NomeOriginal = o.EncaminhamentoFinal.RelatorioVistoria.NomeOriginal,

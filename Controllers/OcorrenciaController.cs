@@ -521,6 +521,223 @@ namespace SIG_Defesa_Civil.API.Controllers
         }
 
         // ══════════════════════════════════════════════════════════════════════════
+        // Central de Documentos — pastas e upload
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Lista as pastas da ocorrência na Central de Documentos
+        /// (padrão + personalizadas criadas pelo usuário).
+        /// </summary>
+        [HttpGet("{id:int}/arquivos/pastas")]
+        [ProducesResponseType(typeof(ApiResponse<List<string>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ListarPastas([FromRoute] int id)
+        {
+            try
+            {
+                var resultado = await _ocorrenciaService.ListarPastasAsync(id);
+                return Ok(ApiResponse<List<string>>.Success(resultado));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"ListarPastas({id})");
+            }
+        }
+
+        /// <summary>
+        /// Cria uma pasta personalizada para a ocorrência (ex.: "Retorno").
+        /// </summary>
+        /// <response code="201">Pasta criada; retorna a lista atualizada de pastas</response>
+        [HttpPost("{id:int}/arquivos/pastas")]
+        [ProducesResponseType(typeof(ApiResponse<List<string>>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> CriarPasta(
+            [FromRoute] int id,
+            [FromBody] CriarPastaRequest request)
+        {
+            try
+            {
+                var resultado = await _ocorrenciaService.CriarPastaAsync(
+                    id, request.Nome, ObterUsuarioIdInterno());
+                return StatusCode(
+                    StatusCodes.Status201Created,
+                    ApiResponse<List<string>>.Success(resultado, "Pasta criada com sucesso"));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrada"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"CriarPasta({id})");
+            }
+        }
+
+        /// <summary>
+        /// Adiciona arquivos a uma pasta da Central de Documentos
+        /// (fotos, fichas de vistoria, relatórios ou pastas personalizadas).
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="pasta">Nome da pasta de destino (padrão ou personalizada)</param>
+        /// <param name="arquivos">Arquivos a enviar (máx. 10 MB cada)</param>
+        /// <response code="201">Arquivos adicionados</response>
+        [HttpPost("{id:int}/arquivos")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AdicionarArquivos(
+            [FromRoute] int id,
+            [FromForm] string pasta,
+            [FromForm] List<IFormFile>? arquivos)
+        {
+            try
+            {
+                if (arquivos == null || arquivos.Count == 0)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "É obrigatório enviar ao menos um arquivo",
+                        ErrosRequisicoes.ARQUIVOS_AUSENTES));
+
+                const long maxFileSize = 10 * 1024 * 1024;
+                var grande = arquivos.FirstOrDefault(a => a.Length > maxFileSize);
+                if (grande != null)
+                    return BadRequest(ApiResponse<object>.Error(
+                        $"Arquivo '{grande.FileName}' excede o tamanho máximo de 10MB",
+                        ErrosRequisicoes.ARQUIVO_MUITO_GRANDE));
+
+                var total = await _ocorrenciaService.AdicionarArquivosAsync(
+                    id, pasta, arquivos, ObterUsuarioIdInterno());
+
+                return StatusCode(
+                    StatusCodes.Status201Created,
+                    ApiResponse<object>.Success(null, $"{total} arquivo(s) adicionados com sucesso"));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrada"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (StorageException ex)
+            {
+                _logger.LogError(ex, "Falha ao salvar arquivos da Central. Ocorrência: {Id}", id);
+                return StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
+                    ApiResponse<object>.Error(
+                        "Sistema temporariamente indisponível. Tente novamente em alguns minutos.",
+                        ErrosRequisicoes.UPLOAD_FAILED));
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"AdicionarArquivos({id}, {pasta})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // Retorno do relatório assinado (PDF) e acompanhamento do cidadão
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Recebe o relatório final preenchido e assinado em PDF (etapa de retorno
+        /// do relatório). Substitui o PDF anterior se já existir.
+        /// </summary>
+        /// <response code="201">Relatório assinado salvo</response>
+        [HttpPost("{id:int}/relatorio-assinado")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> SalvarRelatorioAssinado(
+            [FromRoute] int id,
+            [FromForm] List<IFormFile>? arquivos)
+        {
+            var arquivo = arquivos?.FirstOrDefault();
+            try
+            {
+                if (arquivo == null || arquivo.Length == 0)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "Envie o relatório assinado em PDF",
+                        ErrosRequisicoes.ARQUIVOS_AUSENTES));
+
+                if (!arquivo.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    return BadRequest(ApiResponse<object>.Error(
+                        "O relatório assinado deve ser um arquivo PDF",
+                        ErrosRequisicoes.DADOS_INVALIDOS));
+
+                const long maxFileSize = 10 * 1024 * 1024;
+                if (arquivo.Length > maxFileSize)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "O PDF excede o tamanho máximo de 10MB",
+                        ErrosRequisicoes.ARQUIVO_MUITO_GRANDE));
+
+                await _ocorrenciaService.SalvarRelatorioAssinadoAsync(
+                    id, arquivo, ObterUsuarioIdInterno());
+
+                return StatusCode(
+                    StatusCodes.Status201Created,
+                    ApiResponse<object>.Success(null, "Relatório assinado salvo com sucesso"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"SalvarRelatorioAssinado({id})");
+            }
+        }
+
+        /// <summary>
+        /// Download do relatório final para o cidadão (acompanhamento por protocolo + CPF).
+        /// Prefere o PDF assinado; sem ele, retorna o relatório gerado.
+        /// </summary>
+        /// <response code="200">Arquivo do relatório</response>
+        /// <response code="404">Relatório ainda não disponível</response>
+        [HttpGet("acompanhar/relatorio")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> BaixarRelatorioAcompanhamento(
+            [FromQuery] string protocolo,
+            [FromQuery] string cpf)
+        {
+            try
+            {
+                var resultado = await _ocorrenciaService.ObterRelatorioAcompanhamentoAsync(protocolo, cpf);
+
+                if (resultado == null)
+                    return NaoEncontrado("O relatório final ainda não está disponível para esta ocorrência.");
+
+                var (conteudo, nome, contentType) = resultado.Value;
+                return File(conteudo, contentType, nome);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ApiResponse<object>.Error(ex.Message, ErrosRequisicoes.ACESSO_NEGADO));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"BaixarRelatorioAcompanhamento({protocolo})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
         // POST /api/v1/ocorrencias/{id}/assinatura/{vistoriaId} — Assinatura do Munícipe
         // ══════════════════════════════════════════════════════════════════════════
 

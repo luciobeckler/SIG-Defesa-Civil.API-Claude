@@ -127,5 +127,56 @@ namespace SIG_Defesa_Civil.API.Controllers
                     $"RemoverNotificado(ocorrencia={ocorrenciaId}, notificado={notificadoId})");
             }
         }
+
+        /// <summary>
+        /// Salva a assinatura do notificado (PNG do canvas) — obrigatória quando o
+        /// recebimento do relatório foi PRESENCIAL. Substitui assinatura anterior.
+        /// </summary>
+        /// <param name="ocorrenciaId">ID da ocorrência</param>
+        /// <param name="notificadoId">ID do notificado</param>
+        /// <param name="arquivos">Imagem PNG da assinatura (max 2 MB)</param>
+        /// <response code="201">Assinatura salva</response>
+        /// <response code="404">Notificado não encontrado</response>
+        [HttpPost("notificados/{notificadoId:int}/assinatura")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> SalvarAssinaturaNotificado(
+            [FromRoute] int ocorrenciaId,
+            [FromRoute] int notificadoId,
+            [FromForm] List<IFormFile>? arquivos)
+        {
+            var arquivo = arquivos?.FirstOrDefault();
+            try
+            {
+                if (arquivo == null || arquivo.Length == 0)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "Nenhuma assinatura enviada.",
+                        ErrosRequisicoes.ARQUIVOS_AUSENTES));
+
+                const long maxFileSize = 2 * 1024 * 1024;
+                if (arquivo.Length > maxFileSize)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "Arquivo de assinatura excede o tamanho máximo de 2 MB.",
+                        ErrosRequisicoes.ARQUIVO_MUITO_GRANDE));
+
+                await _notificacaoService.SalvarAssinaturaNotificadoAsync(
+                    ocorrenciaId, notificadoId, arquivo, ObterUsuarioIdInterno());
+
+                return StatusCode(
+                    StatusCodes.Status201Created,
+                    ApiResponse<object>.Success(null, "Assinatura do notificado salva com sucesso"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger,
+                    $"SalvarAssinaturaNotificado(ocorrencia={ocorrenciaId}, notificado={notificadoId})");
+            }
+        }
     }
 }

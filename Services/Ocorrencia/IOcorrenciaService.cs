@@ -101,5 +101,40 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         /// Lança <see cref="InvalidOperationException"/> se a vistoria não pertencer à ocorrência.
         /// </summary>
         Task SalvarAssinaturaAsync(int ocorrenciaId, int vistoriaId, IFormFile arquivo, int usuarioId);
+
+        // ── Central de Documentos ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Lista as pastas da ocorrência na Central de Documentos:
+        /// padrão (uma por tipo de arquivo) + personalizadas criadas pelo usuário.
+        /// </summary>
+        Task<List<string>> ListarPastasAsync(int ocorrenciaId);
+
+        /// <summary>
+        /// Cria uma pasta personalizada para a ocorrência (ex.: "Retorno").
+        /// Idempotente. Retorna a lista atualizada de pastas.
+        /// </summary>
+        Task<List<string>> CriarPastaAsync(int ocorrenciaId, string nome, int usuarioId);
+
+        /// <summary>
+        /// Adiciona arquivos a uma pasta da Central de Documentos.
+        /// Pastas padrão gravam com o TipoArquivo correspondente; pastas
+        /// personalizadas gravam com o nome da pasta como categoria.
+        /// </summary>
+        Task<int> AdicionarArquivosAsync(int ocorrenciaId, string pasta, List<IFormFile> arquivos, int usuarioId);
+
+        // ── Retorno do relatório assinado / acompanhamento ───────────────────────
+
+        /// <summary>
+        /// Salva o relatório final preenchido e assinado (PDF) — etapa de retorno
+        /// do relatório. Substitui o PDF anterior se já existir.
+        /// </summary>
+        Task SalvarRelatorioAssinadoAsync(int ocorrenciaId, IFormFile arquivo, int usuarioId);
+
+        /// <summary>
+        /// Retorna o relatório final para o acompanhamento do cidadão (protocolo + CPF).
+        /// Prefere o PDF assinado; retorna null se ainda não houver relatório disponível.
+        /// </summary>
+        Task<(Stream Conteudo, string Nome, string ContentType)?> ObterRelatorioAcompanhamentoAsync(string protocolo, string cpf);
     }
 }

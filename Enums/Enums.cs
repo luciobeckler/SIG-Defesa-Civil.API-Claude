@@ -4,7 +4,7 @@
     public enum TipoUsuario { CIDADAO, ATENDENTE, VISTORIADOR, ADMIN }
 
     // ─── Arquivos ────────────────────────────────────────────────────────────────
-    public enum TipoArquivo { FOTO_CIDADAO, COMPROVANTE_RESIDENCIA, FICHA_VISTORIA, FOTO_CAMPO, RELATORIO_FINAL, ASSINATURA_MUNICIPIO }
+    public enum TipoArquivo { FOTO_CIDADAO, COMPROVANTE_RESIDENCIA, FICHA_VISTORIA, FOTO_CAMPO, RELATORIO_FINAL, RELATORIO_ASSINADO, ASSINATURA_MUNICIPIO }
 
     // ─── LGPD ────────────────────────────────────────────────────────────────────
     public enum AcaoLgpd { VISUALIZOU, BAIXOU, EDITOU, EXCLUIU, CRIOU }
@@ -103,11 +103,15 @@
         SEC_OBRAS
     }
 
-    // ─── Etapa 6 — Encaminhamento Final ──────────────────────────────────────────
-    public enum CanalEntregaRelatorio
+    // ─── Notificados (propriedade da ocorrência) ─────────────────────────────────
+    /// <summary>
+    /// Como o notificado recebeu o relatório. PRESENCIAL exige coleta de assinatura.
+    /// A entrega institucional do relatório é sempre por e-mail.
+    /// </summary>
+    public enum FormaRecebimentoRelatorio
     {
         EMAIL,
-        WHATSAPP
+        PRESENCIAL
     }
 
     // ─── Legado (mantido para compatibilidade com código existente) ───────────────

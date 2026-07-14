@@ -108,6 +108,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             var agendamentos = await _context.AgendamentosVistoria
                 .Include(a => a.Vistoriador1)
                 .Include(a => a.Vistoriador2)
+                .Include(a => a.Vistoriador3)
+                .Include(a => a.Vistoriador4)
                 .Include(a => a.AgendadoPor)
                 .Include(a => a.Tentativas)
                 .Where(a => a.OcorrenciaId == ocorrenciaId)
@@ -122,6 +124,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             var agendamento = await _context.AgendamentosVistoria
                 .Include(a => a.Vistoriador1)
                 .Include(a => a.Vistoriador2)
+                .Include(a => a.Vistoriador3)
+                .Include(a => a.Vistoriador4)
                 .Include(a => a.AgendadoPor)
                 .Include(a => a.Tentativas)
                 .FirstOrDefaultAsync(a => a.Id == agendamentoId);
@@ -137,6 +141,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             var agendamento = await _context.AgendamentosVistoria
                 .Include(a => a.Vistoriador1)
                 .Include(a => a.Vistoriador2)
+                .Include(a => a.Vistoriador3)
+                .Include(a => a.Vistoriador4)
                 .Include(a => a.AgendadoPor)
                 .Include(a => a.Tentativas)
                 .FirstOrDefaultAsync(a => a.Id == agendamentoId)
@@ -180,6 +186,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             var agendamento = await _context.AgendamentosVistoria
                 .Include(a => a.Vistoriador1)
                 .Include(a => a.Vistoriador2)
+                .Include(a => a.Vistoriador3)
+                .Include(a => a.Vistoriador4)
                 .Include(a => a.AgendadoPor)
                 .Include(a => a.Tentativas)
                 .FirstOrDefaultAsync(a => a.Id == agendamentoId && a.OcorrenciaId == ocorrenciaId)
@@ -190,17 +198,27 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
                 throw new InvalidOperationException(
                     $"Só é possível atribuir vistoriadores a agendamentos ATIVOS. Status atual: {agendamento.Status}.");
 
-            // Valida a equipe designada
-            await ValidarVistoriadorAsync(request.Vistoriador1Id, 1);
-            if (request.Vistoriador2Id.HasValue)
+            // Valida a equipe designada (até 4 pessoas; apenas o 1º é obrigatório)
+            var equipe = new (int? Id, int Numero)[]
             {
-                if (request.Vistoriador2Id == request.Vistoriador1Id)
-                    throw new InvalidOperationException("O vistoriador 1 e o vistoriador 2 não podem ser o mesmo usuário.");
-                await ValidarVistoriadorAsync(request.Vistoriador2Id.Value, 2);
-            }
+                (request.Vistoriador1Id, 1),
+                (request.Vistoriador2Id, 2),
+                (request.Vistoriador3Id, 3),
+                (request.Vistoriador4Id, 4),
+            };
+
+            var idsInformados = equipe.Where(e => e.Id.HasValue).Select(e => e.Id!.Value).ToList();
+            if (idsInformados.Count != idsInformados.Distinct().Count())
+                throw new InvalidOperationException("A equipe não pode ter o mesmo vistoriador em mais de uma posição.");
+
+            foreach (var (id, numero) in equipe)
+                if (id.HasValue)
+                    await ValidarVistoriadorAsync(id.Value, numero);
 
             agendamento.Vistoriador1Id = request.Vistoriador1Id;
             agendamento.Vistoriador2Id = request.Vistoriador2Id;
+            agendamento.Vistoriador3Id = request.Vistoriador3Id;
+            agendamento.Vistoriador4Id = request.Vistoriador4Id;
 
             await _context.SaveChangesAsync();
 
@@ -212,6 +230,10 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             await _context.Entry(agendamento).Reference(a => a.Vistoriador1).LoadAsync();
             if (agendamento.Vistoriador2Id.HasValue)
                 await _context.Entry(agendamento).Reference(a => a.Vistoriador2).LoadAsync();
+            if (agendamento.Vistoriador3Id.HasValue)
+                await _context.Entry(agendamento).Reference(a => a.Vistoriador3).LoadAsync();
+            if (agendamento.Vistoriador4Id.HasValue)
+                await _context.Entry(agendamento).Reference(a => a.Vistoriador4).LoadAsync();
 
             return MapearAgendamentoDto(agendamento);
         }
@@ -289,6 +311,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
                 AgendamentoId = agendamentoOrigem.Id,
                 Vistoriador1Id = agendamentoOrigem.Vistoriador1Id.Value,
                 Vistoriador2Id = agendamentoOrigem.Vistoriador2Id,
+                Vistoriador3Id = agendamentoOrigem.Vistoriador3Id,
+                Vistoriador4Id = agendamentoOrigem.Vistoriador4Id,
                 DataVistoria = request.DataVistoria,
                 HorarioInicio = request.HorarioInicio,
                 HorarioTermino = request.HorarioTermino,
@@ -340,6 +364,10 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             await _context.Entry(vistoria).Reference(v => v.Vistoriador1).LoadAsync();
             if (vistoria.Vistoriador2Id.HasValue)
                 await _context.Entry(vistoria).Reference(v => v.Vistoriador2).LoadAsync();
+            if (vistoria.Vistoriador3Id.HasValue)
+                await _context.Entry(vistoria).Reference(v => v.Vistoriador3).LoadAsync();
+            if (vistoria.Vistoriador4Id.HasValue)
+                await _context.Entry(vistoria).Reference(v => v.Vistoriador4).LoadAsync();
             return MapearVistoriaDto(vistoria);
         }
 
@@ -349,6 +377,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
                 .Include(v => v.RegistradoPor)
                 .Include(v => v.Vistoriador1)
                 .Include(v => v.Vistoriador2)
+                .Include(v => v.Vistoriador3)
+                .Include(v => v.Vistoriador4)
                 .Where(v => v.OcorrenciaId == ocorrenciaId)
                 .OrderBy(v => v.Numero)
                 .ToListAsync();
@@ -362,6 +392,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
                 .Include(v => v.RegistradoPor)
                 .Include(v => v.Vistoriador1)
                 .Include(v => v.Vistoriador2)
+                .Include(v => v.Vistoriador3)
+                .Include(v => v.Vistoriador4)
                 .FirstOrDefaultAsync(v => v.Id == vistoriaId);
 
             return vistoria == null ? null : MapearVistoriaDto(vistoria);
@@ -376,6 +408,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
                 .Include(v => v.RegistradoPor)
                 .Include(v => v.Vistoriador1)
                 .Include(v => v.Vistoriador2)
+                .Include(v => v.Vistoriador3)
+                .Include(v => v.Vistoriador4)
                 .FirstOrDefaultAsync(v => v.Id == vistoriaId)
                 ?? throw new InvalidOperationException(
                     $"Vistoria {vistoriaId} não encontrada. Use o endpoint de criação (POST).");
@@ -508,6 +542,8 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             var agendamento = await _context.AgendamentosVistoria
                 .Include(a => a.Vistoriador1)
                 .Include(a => a.Vistoriador2)
+                .Include(a => a.Vistoriador3)
+                .Include(a => a.Vistoriador4)
                 .Include(a => a.AgendadoPor)
                 .Include(a => a.Tentativas)
                 .FirstAsync(a => a.Id == agendamentoId);
@@ -528,6 +564,12 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             Vistoriador2Id = a.Vistoriador2Id,
             NomeVistoriador2 = a.Vistoriador2?.Nome,
             MatriculaVistoriador2 = a.Vistoriador2?.Matricula,
+            Vistoriador3Id = a.Vistoriador3Id,
+            NomeVistoriador3 = a.Vistoriador3?.Nome,
+            MatriculaVistoriador3 = a.Vistoriador3?.Matricula,
+            Vistoriador4Id = a.Vistoriador4Id,
+            NomeVistoriador4 = a.Vistoriador4?.Nome,
+            MatriculaVistoriador4 = a.Vistoriador4?.Matricula,
             AgendadoPor = a.AgendadoPor.Nome,
             AgendadoEm = a.AgendadoEm,
             Tentativas = a.Tentativas
@@ -578,6 +620,10 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             MatriculaVistoriador1 = v.Vistoriador1.Matricula,
             NomeVistoriador2 = v.Vistoriador2?.Nome,
             MatriculaVistoriador2 = v.Vistoriador2?.Matricula,
+            NomeVistoriador3 = v.Vistoriador3?.Nome,
+            MatriculaVistoriador3 = v.Vistoriador3?.Matricula,
+            NomeVistoriador4 = v.Vistoriador4?.Nome,
+            MatriculaVistoriador4 = v.Vistoriador4?.Matricula,
             RegistradoPor = v.RegistradoPor.Nome,
             RegistradoEm = v.RegistradoEm
         };

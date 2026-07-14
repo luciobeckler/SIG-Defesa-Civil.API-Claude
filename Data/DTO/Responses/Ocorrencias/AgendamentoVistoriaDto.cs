@@ -22,6 +22,14 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public string? NomeVistoriador2 { get; set; }
         public string? MatriculaVistoriador2 { get; set; }
 
+        public int? Vistoriador3Id { get; set; }
+        public string? NomeVistoriador3 { get; set; }
+        public string? MatriculaVistoriador3 { get; set; }
+
+        public int? Vistoriador4Id { get; set; }
+        public string? NomeVistoriador4 { get; set; }
+        public string? MatriculaVistoriador4 { get; set; }
+
         // Tentativas (em ordem crescente de NumeroTentativa)
         public List<TentativaVistoriaDto> Tentativas { get; set; } = new();
 

@@ -56,6 +56,10 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public string? MatriculaVistoriador1 { get; set; }
         public string? NomeVistoriador2 { get; set; }
         public string? MatriculaVistoriador2 { get; set; }
+        public string? NomeVistoriador3 { get; set; }
+        public string? MatriculaVistoriador3 { get; set; }
+        public string? NomeVistoriador4 { get; set; }
+        public string? MatriculaVistoriador4 { get; set; }
 
         public string RegistradoPor { get; set; } = string.Empty;
         public DateTime RegistradoEm { get; set; }

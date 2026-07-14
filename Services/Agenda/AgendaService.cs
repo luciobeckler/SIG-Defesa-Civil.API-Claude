@@ -28,6 +28,8 @@ namespace SIG_Defesa_Civil.API.Services.Agenda
                 .Include(a => a.Ocorrencia).ThenInclude(o => o.AvaliacaoRisco)
                 .Include(a => a.Vistoriador1)
                 .Include(a => a.Vistoriador2)
+                .Include(a => a.Vistoriador3)
+                .Include(a => a.Vistoriador4)
                 .Where(a => a.Status == StatusAgendamento.ATIVO
                          && a.Data != null
                          && a.Data >= inicio && a.Data <= fim
@@ -50,6 +52,8 @@ namespace SIG_Defesa_Civil.API.Services.Agenda
                 .Include(a => a.Ocorrencia).ThenInclude(o => o.AvaliacaoRisco)
                 .Include(a => a.Vistoriador1)
                 .Include(a => a.Vistoriador2)
+                .Include(a => a.Vistoriador3)
+                .Include(a => a.Vistoriador4)
                 .Include(a => a.Tentativas)
                 .FirstOrDefaultAsync(a => a.Id == agendamentoId && a.OcorrenciaId == ocorrenciaId)
                 ?? throw new InvalidOperationException(
@@ -100,6 +104,10 @@ namespace SIG_Defesa_Civil.API.Services.Agenda
             NomeVistoriador1 = a.Vistoriador1?.Nome,
             Vistoriador2Id = a.Vistoriador2Id,
             NomeVistoriador2 = a.Vistoriador2?.Nome,
+            Vistoriador3Id = a.Vistoriador3Id,
+            NomeVistoriador3 = a.Vistoriador3?.Nome,
+            Vistoriador4Id = a.Vistoriador4Id,
+            NomeVistoriador4 = a.Vistoriador4?.Nome,
         };
     }
 }

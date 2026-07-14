@@ -27,5 +27,9 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Agenda
         public string? NomeVistoriador1 { get; set; }
         public int? Vistoriador2Id { get; set; }
         public string? NomeVistoriador2 { get; set; }
+        public int? Vistoriador3Id { get; set; }
+        public string? NomeVistoriador3 { get; set; }
+        public int? Vistoriador4Id { get; set; }
+        public string? NomeVistoriador4 { get; set; }
     }
 }

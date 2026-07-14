@@ -41,13 +41,11 @@ namespace SIG_Defesa_Civil.API.Services.Storage
             return Task.FromResult(protocolo);
         }
 
-        /// <summary>Mapeia o tipo de arquivo para a subpasta correspondente.</summary>
-        private string ObterSubPasta(TipoArquivo tipoArquivo) => tipoArquivo switch
-        {
-            TipoArquivo.FOTO_CIDADAO => _settings.SubPastaFotosMunicipe,
-            TipoArquivo.FOTO_CAMPO   => _settings.SubPastaFotosVistoria,
-            _                        => _settings.SubPastaDocumentos,
-        };
+        /// <summary>
+        /// Cada tipo de arquivo tem seu próprio prefixo, espelhando as categorias
+        /// da Central de Documentos (ver <see cref="PastasArquivo"/>).
+        /// </summary>
+        private static string ObterSubPasta(TipoArquivo tipoArquivo) => PastasArquivo.De(tipoArquivo);
 
         /// <summary>
         /// Converte o caminho relativo gravado no banco (ex: /2026-0001/Documentos/foto.jpg)
@@ -108,6 +106,65 @@ namespace SIG_Defesa_Civil.API.Services.Storage
                 caminhos.Add(caminho);
             }
             return caminhos;
+        }
+
+        public async Task<string> SalvarArquivoEmPastaAsync(
+            string protocolo,
+            string pasta,
+            string nomeArquivo,
+            Stream stream)
+        {
+            var pastaSegura = PastasArquivo.SanitizarNome(pasta);
+            var caminhoRelativo = $"/{protocolo}/{pastaSegura}/{nomeArquivo}";
+            var s3Key = ToS3Key(caminhoRelativo);
+
+            try
+            {
+                await _s3.PutObjectAsync(new PutObjectRequest
+                {
+                    BucketName            = _settings.BucketName,
+                    Key                   = s3Key,
+                    InputStream           = stream,
+                    AutoCloseStream       = false,
+                    DisablePayloadSigning = true,
+                });
+                _logger.LogInformation("Arquivo salvo no R2 (pasta personalizada): {Key}", s3Key);
+                return caminhoRelativo;
+            }
+            catch (AmazonS3Exception ex)
+            {
+                throw new StorageException(
+                    $"Erro ao salvar arquivo no R2: {s3Key}", ex, StorageErrorType.ErroLeituraEscrita);
+            }
+        }
+
+        /// <summary>No R2/S3 pastas são prefixos implícitos — nada a criar.</summary>
+        public Task CriarPastaAsync(string protocolo, string pasta)
+        {
+            PastasArquivo.SanitizarNome(pasta); // valida o nome
+            return Task.CompletedTask;
+        }
+
+        /// <summary>Deriva as "pastas" dos prefixos de chave existentes no bucket.</summary>
+        public async Task<List<string>> ListarPastasAsync(string protocolo)
+        {
+            try
+            {
+                var resp = await _s3.ListObjectsV2Async(new ListObjectsV2Request
+                {
+                    BucketName = _settings.BucketName,
+                    Prefix     = $"{protocolo}/",
+                    Delimiter  = "/",
+                });
+                return resp.CommonPrefixes
+                    .Select(p => p.TrimEnd('/').Split('/').Last())
+                    .OrderBy(p => p)
+                    .ToList();
+            }
+            catch (AmazonS3Exception)
+            {
+                return new List<string>();
+            }
         }
 
         /// <summary>
