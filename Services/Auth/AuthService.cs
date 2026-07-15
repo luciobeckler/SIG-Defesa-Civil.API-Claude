@@ -102,6 +102,49 @@ namespace SIG_Defesa_Civil.API.Services.Auth
             return usuario is null ? null : MapearDto(usuario);
         }
 
+        public async Task<UsuarioResponseDto> AtualizarUsuarioAsync(int id, AtualizarUsuarioRequest request)
+        {
+            var usuario = await _context.Usuarios.FindAsync(id)
+                ?? throw new InvalidOperationException($"Usuário {id} não encontrado.");
+
+            var emailEmUso = await _context.Usuarios
+                .AnyAsync(u => u.Id != id && u.Email == request.Email);
+            if (emailEmUso)
+                throw new InvalidOperationException($"Já existe outro usuário com o e-mail '{request.Email}'.");
+
+            usuario.Nome = request.Nome.Trim();
+            usuario.Email = request.Email.Trim();
+
+            await _context.SaveChangesAsync();
+            return MapearDto(usuario);
+        }
+
+        public async Task<UsuarioResponseDto> AlterarAtivoAsync(int id, bool ativo, int usuarioLogadoId)
+        {
+            var usuario = await _context.Usuarios.FindAsync(id)
+                ?? throw new InvalidOperationException($"Usuário {id} não encontrado.");
+
+            if (!ativo)
+            {
+                if (id == usuarioLogadoId)
+                    throw new InvalidOperationException("Você não pode desativar o seu próprio usuário.");
+
+                // Evita lockout: sempre deve restar ao menos um ADMIN ativo
+                if (usuario.TipoUsuario == TipoUsuario.ADMIN)
+                {
+                    var outrosAdminsAtivos = await _context.Usuarios
+                        .AnyAsync(u => u.Id != id && u.TipoUsuario == TipoUsuario.ADMIN && u.Ativo);
+                    if (!outrosAdminsAtivos)
+                        throw new InvalidOperationException(
+                            "Não é possível desativar o último administrador ativo do sistema.");
+                }
+            }
+
+            usuario.Ativo = ativo;
+            await _context.SaveChangesAsync();
+            return MapearDto(usuario);
+        }
+
         // ── Privados ──────────────────────────────────────────────────────────────
 
         private string GerarToken(Usuario usuario, DateTime expiration)

@@ -115,5 +115,60 @@ namespace SIG_Defesa_Civil.API.Controllers
                 return ErroInterno(ex, _logger, nameof(ObterPorId));
             }
         }
+
+        /// <summary>
+        /// Atualiza nome e e-mail de um usuário (somente ADMIN).
+        /// </summary>
+        [HttpPut("{id:int}")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> Atualizar(int id, [FromBody] AtualizarUsuarioRequest request)
+        {
+            try
+            {
+                var usuario = await _authService.AtualizarUsuarioAsync(id, request);
+                return Ok(ApiResponse<object>.Success(usuario, "Usuário atualizado com sucesso."));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrado"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, nameof(Atualizar));
+            }
+        }
+
+        /// <summary>
+        /// Ativa ou desativa um usuário (desativação lógica — o registro nunca é excluído).
+        /// Usuários desativados não conseguem entrar no sistema nem receber novas atribuições.
+        /// </summary>
+        [HttpPatch("{id:int}/ativo")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> AlterarAtivo(int id, [FromBody] AlterarStatusUsuarioRequest request)
+        {
+            try
+            {
+                var usuario = await _authService.AlterarAtivoAsync(
+                    id, request.Ativo, ObterUsuarioIdInterno());
+                var acao = request.Ativo ? "reativado" : "desativado";
+                return Ok(ApiResponse<object>.Success(usuario, $"Usuário {acao} com sucesso."));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrado"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, nameof(AlterarAtivo));
+            }
+        }
     }
 }
