@@ -1,4 +1,4 @@
-﻿using SIG_Defesa_Civil.API.Data.DTO.Responses.Arquivos;
+using SIG_Defesa_Civil.API.Data.DTO.Responses.Arquivos;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Usuairos;
 using SIG_Defesa_Civil.API.Enums;
 
@@ -22,7 +22,7 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
 
         // Resumo de risco (Etapa 2, se existir)
         public GrauRisco? GrauRiscoInicial { get; set; }
-        public TipificacaoOcorrencia? TipificacaoInicial { get; set; }
+        public List<string> TipificacaoInicial { get; set; } = new();
 
         // Metadados de acesso (transparência LGPD)
         public AcessoLgpdDto UltimoAcesso { get; set; } = null!;

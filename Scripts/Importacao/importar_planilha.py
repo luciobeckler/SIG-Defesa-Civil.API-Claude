@@ -259,10 +259,27 @@ def num_vistoria(v) -> str:
     return so_digitos(s)
 
 
+def formatar_protocolo(numero: str) -> str | None:
+    """
+    Converte o número da planilha para o formato de protocolo do sistema:
+        2025001 -> 2025-0001   |   2026653 -> 2026-0653
+    Os 4 primeiros dígitos são o ano; o restante é a sequência (4 dígitos).
+    Retorna None se o número não tiver o formato esperado.
+    """
+    if len(numero) < 5 or not numero.isdigit():
+        return None
+    ano, seq = numero[:4], numero[4:]
+    return f"{ano}-{int(seq):04d}"
+
+
 # ── Geração do SQL ────────────────────────────────────────────────────────────
 
 def main():
-    xlsx = sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\lucio\Downloads\PLANILHAS DE OCORRENCIAS.xlsx"
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    flags = {a for a in sys.argv[1:] if a.startswith("--")}
+    limpar = "--limpar" in flags
+
+    xlsx = args[0] if args else r"C:\Users\lucio\Downloads\PLANILHAS DE OCORRENCIAS.xlsx"
     OUT.mkdir(exist_ok=True)
 
     wb = openpyxl.load_workbook(xlsx, data_only=True)
@@ -287,7 +304,12 @@ def main():
     mapa_vist = carregar_ou_propor_mapeamento(nomes)
 
     def canonico(nome: str) -> str:
-        return mapa_vist.get(norm_chave(nome)) or titulo(nome)
+        """Nome canônico do de-para. Valor em branco no CSV = ignorar o nome
+        (ex.: 'DEMAIS SECRETARIAS', que não é uma pessoa)."""
+        chave = norm_chave(nome)
+        if chave in mapa_vist:
+            return mapa_vist[chave]  # pode ser "" → ignorado
+        return titulo(nome)
 
     sql: list[str] = []
     previa, normalizacoes, rejeitadas = [], set(), []
@@ -299,6 +321,25 @@ def main():
     W("-- Idempotente: reexecutar não duplica registros (ON CONFLICT / NOT EXISTS).")
     W("BEGIN;")
     W("")
+
+    # 0. Limpeza da base de testes (opcional, via --limpar).
+    #    Remove SOMENTE as ocorrências e tudo que depende delas. Os usuários
+    #    (admin, servidores) são preservados. Roda na MESMA transação: se a
+    #    importação falhar depois, a limpeza também é desfeita.
+    if limpar:
+        W("-- ══════════════════════════════════════════════════════════════════")
+        W("-- LIMPEZA DA BASE DE TESTES (--limpar)")
+        W("-- Apaga as ocorrências e seus dependentes. USUÁRIOS SÃO PRESERVADOS.")
+        W("-- ══════════════════════════════════════════════════════════════════")
+        # log_acesso_lgpd referencia ocorrencias com NO ACTION → apagar antes.
+        W('DELETE FROM log_acesso_lgpd WHERE "OcorrenciaId" IS NOT NULL;')
+        # As demais dependentes (localizacoes, arquivos, avaliacoes_risco,
+        # agendamentos_vistoria -> tentativas, vistorias, notificados,
+        # encaminhamentos_finais, Observacoes) caem por CASCADE.
+        W("DELETE FROM ocorrencias;")
+        # Catálogo de opções personalizadas criado durante os testes.
+        W("DELETE FROM opcoes_campo_vistoria;")
+        W("")
 
     # 1. Usuário de sistema para a importação
     W("-- Usuário de sistema (autor dos registros importados)")
@@ -327,11 +368,22 @@ ON CONFLICT ("Campo","Valor") DO NOTHING;""")
         return f"(SELECT \"Id\" FROM usuarios WHERE \"Email\" = 'v.{slug(nome_canonico)}@vistoriador.importado')"
 
     # 3. Linha a linha
+    protocolos_gerados: dict[str, str] = {}  # protocolo -> número original (detecta colisão)
+
     for ano, l in todas:
-        proto = num_vistoria(l.get("N_DA_VISTORIA"))
-        if not proto or len(proto) < 5:
+        num_planilha = num_vistoria(l.get("N_DA_VISTORIA"))
+        proto = formatar_protocolo(num_planilha)
+        if not proto:
             rejeitadas.append({"protocolo": limpo(l.get('N_DA_VISTORIA')), "motivo": "número de vistoria inválido"})
             continue
+
+        if proto in protocolos_gerados:
+            rejeitadas.append({
+                "protocolo": proto,
+                "motivo": f"protocolo duplicado (números {protocolos_gerados[proto]} e {num_planilha} geram o mesmo)",
+            })
+            continue
+        protocolos_gerados[proto] = num_planilha
 
         nome_sol = limpo(l.get("NOME DO SOLICITANTE")) or "Não informado"
         data_sol = como_data(l.get("DATA_SOLICITACAO"))
@@ -362,8 +414,8 @@ ON CONFLICT ("Campo","Valor") DO NOTHING;""")
 
         data_vist = como_data(l.get("DATA DA VISTORIA")) or data_sol
         equipe = [canonico(n) for n in parse_vistoriadores(l.get("VISTORIADORES"))]
-        # dedupe preservando ordem
-        equipe = list(dict.fromkeys(equipe))
+        # remove ignorados (canônico em branco) e dedupe preservando ordem
+        equipe = list(dict.fromkeys(n for n in equipe if n))
         vistoriadores_canonicos.update(equipe)
         # Equipe de até 4 pessoas (colunas Vistoriador1..4); excedentes vão p/ observação
         v1, v2, v3, v4 = (equipe + [None] * 4)[:4]
@@ -417,22 +469,15 @@ ON CONFLICT ("Campo","Valor") DO NOTHING;""")
 
         W(f"-- ── Ocorrência {proto} ({status}) " + "─" * 30)
 
-        # 3a. Solicitante
-        if cpf:
-            W(f"""INSERT INTO usuarios ("Nome","Email","Cpf","Telefone","TipoUsuario","Ativo","CriadoEm")
-VALUES ({sql_str_nn(nome_sol)}, {sql_str_nn(email_l, f'cid.{cpf}@importado.local')}, '{cpf}', {sql_str(telefone)}, 'CIDADAO', TRUE, {abertura_ts})
-ON CONFLICT ("Cpf") DO NOTHING;""")
-            subq_sol = f"(SELECT \"Id\" FROM usuarios WHERE \"Cpf\" = '{cpf}')"
-        else:
-            email_sol = email_l or f"sol.{proto}@importado.local"
-            W(f"""INSERT INTO usuarios ("Nome","Email","Telefone","TipoUsuario","Ativo","CriadoEm")
-SELECT {sql_str_nn(nome_sol)}, {sql_str_nn(email_sol)}, {sql_str(telefone)}, 'CIDADAO', TRUE, {abertura_ts}
-WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE "Email" = {sql_str_nn(email_sol)});""")
-            subq_sol = f"(SELECT \"Id\" FROM usuarios WHERE \"Email\" = {sql_str_nn(email_sol)} LIMIT 1)"
+        # 3a. Solicitante — gravado na própria ocorrência.
+        #     Cidadãos não são usuários do sistema (não têm conta nem login).
+        sql_cpf = f"'{cpf}'" if cpf else "NULL"
+        email_sol = email_l or (f"cid.{cpf}@importado.local" if cpf
+                                else f"sol.{num_planilha}@importado.local")
 
         # 3b. Ocorrência
-        W(f"""INSERT INTO ocorrencias ("Protocolo","SolicitanteId","DescricaoProblema","Status","CriadoPorId","AbertaEm","AtualizadoEm")
-SELECT '{proto}', {subq_sol}, {sql_str_nn(descricao)}, '{status}', {subq_importador}, {abertura_ts}, {abertura_ts}
+        W(f"""INSERT INTO ocorrencias ("Protocolo","SolicitanteNome","SolicitanteCpf","SolicitanteEmail","SolicitanteTelefone","DescricaoProblema","Status","CriadoPorId","AbertaEm","AtualizadoEm")
+SELECT '{proto}', {sql_str_nn(nome_sol)}, {sql_cpf}, {sql_str_nn(email_sol)}, {sql_str(telefone)}, {sql_str_nn(descricao)}, '{status}', {subq_importador}, {abertura_ts}, {abertura_ts}
 WHERE NOT EXISTS (SELECT 1 FROM ocorrencias WHERE "Protocolo" = '{proto}');""")
         subq_oc = f"(SELECT \"Id\" FROM ocorrencias WHERE \"Protocolo\" = '{proto}')"
 
@@ -479,7 +524,7 @@ WHERE NOT EXISTS (SELECT 1 FROM vistorias WHERE "OcorrenciaId" = {subq_oc});""")
         W("")
 
         previa.append({
-            "protocolo": proto, "ano": ano, "status": status, "solicitante": nome_sol,
+            "protocolo": proto, "numero_planilha": num_planilha, "ano": ano, "status": status, "solicitante": nome_sol,
             "cpf": cpf or "-", "endereco": f"{endereco}, {numero}", "bairro": bairro,
             "aberta_em": f"{data_sol} {hora_sol or ''}".strip(), "data_vistoria": data_vist if modo != "DISPENSAVEL" else "-",
             "grau_risco": grau if modo == "REALIZADA" else "-", "interdicao": interdicao if modo == "REALIZADA" else "-",
@@ -496,14 +541,54 @@ WHERE NOT EXISTS (SELECT 1 FROM vistorias WHERE "OcorrenciaId" = {subq_oc});""")
 SELECT {sql_str_nn(nome)}, '{email}', 'VISTORIADOR', FALSE, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE "Email" = '{email}');""")
     bloco_vist.append("")
-    # Insere o bloco de vistoriadores logo após o catálogo (antes das ocorrências)
+
+    # 4b. Guarda de colisão de protocolo.
+    # Com o formato AAAA-NNNN, um protocolo da planilha pode coincidir com um
+    # gerado pelo próprio sistema. Nesse caso a ocorrência seria pulada, mas o
+    # agendamento/vistoria acabaria pendurado na ocorrência errada. Abortamos.
+    # Protocolos criados por uma execução anterior DESTA importação são aceitos
+    # (mantém a idempotência).
+    lista_protos = ",\n        ".join(
+        "'" + p + "'" for p in sorted(protocolos_gerados)
+    )
+    bloco_guard = [
+        "-- ── Guarda: colisão de protocolo ────────────────────────────────────",
+        "DO $$",
+        "DECLARE conflitos int;",
+        "BEGIN",
+        "    SELECT count(*) INTO conflitos",
+        "      FROM ocorrencias o",
+        "     WHERE o.\"Protocolo\" = ANY (ARRAY[",
+        f"        {lista_protos}",
+        "     ])",
+        f"       AND o.\"CriadoPorId\" <> (SELECT \"Id\" FROM usuarios WHERE \"Email\" = '{EMAIL_IMPORTADOR}');",
+        "    IF conflitos > 0 THEN",
+        "        RAISE EXCEPTION 'Importacao abortada: % protocolo(s) da planilha ja existem no banco e nao foram criados por esta importacao. Resolva os conflitos antes de importar.', conflitos;",
+        "    END IF;",
+        "END $$;",
+        "",
+    ]
+
+    # Insere guarda + vistoriadores logo após o catálogo (antes das ocorrências)
     pos = sql.index("")  # primeira linha em branco após o cabeçalho
     # encontra o fim do bloco de catálogo (última linha antes da primeira ocorrência)
     for i, linha in enumerate(sql):
         if linha.startswith("-- ── Ocorrência"):
             pos = i
             break
-    sql[pos:pos] = bloco_vist
+    sql[pos:pos] = bloco_guard + bloco_vist
+
+    # 5. Avança a sequence de protocolo para além dos números importados,
+    #    senão o sistema emitiria protocolos já usados (ex.: 2026-0007).
+    W("-- ── Sequence de protocolo ────────────────────────────────────────────")
+    W("-- Garante que novos protocolos gerados pelo sistema não colidam com os importados.")
+    W("""SELECT setval('seq_protocolo_ano', GREATEST(
+    (SELECT last_value FROM seq_protocolo_ano),
+    (SELECT COALESCE(MAX(split_part("Protocolo", '-', 2)::int), 0)
+       FROM ocorrencias
+      WHERE "Protocolo" ~ '^[0-9]{4}-[0-9]+$')
+));""")
+    W("")
 
     W("COMMIT;")
 
@@ -526,6 +611,9 @@ WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE "Email" = '{email}');""")
         w.writeheader()
         w.writerows(rejeitadas)
 
+    if limpar:
+        print("[!] MODO --limpar: o import.sql apaga TODAS as ocorrências existentes")
+        print("    (e o catálogo de opções) antes de importar. Usuários são preservados.")
     print(f"[ok] {len(previa)} ocorrências geradas | {len(rejeitadas)} rejeitadas")
     print(f"[ok] Vistoriadores (contas desativadas): {len(vistoriadores_canonicos)}")
     print(f"[ok] Saídas em {OUT}")

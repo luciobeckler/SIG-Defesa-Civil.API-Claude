@@ -9,7 +9,11 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
     /// </summary>
     public class RegistrarAvaliacaoRiscoRequest
     {
-        [Required] public TipificacaoOcorrencia TipificacaoInicial { get; set; }
+        /// <summary>
+        /// Uma ou mais tipificações. Aceita os valores do catálogo padrão e as
+        /// opções personalizadas criadas pelos usuários.
+        /// </summary>
+        [Required] public List<string> TipificacaoInicial { get; set; } = new();
         [Required] public GrauRisco GrauRiscoInicial { get; set; }
 
         /// <summary>ID do usuário agente que realiza a triagem (diferente do solicitante).</summary>

@@ -18,7 +18,14 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         public Ocorrencia Ocorrencia { get; set; } = null!;
 
         // ── Classificação inicial ────────────────────────────────────────────────
-        public TipificacaoOcorrencia TipificacaoInicial { get; set; }
+        /// <summary>
+        /// Tipificações identificadas na triagem — multi-seleção (text[]).
+        /// Uma mesma ocorrência costuma acumular mais de uma (ex.: trincas +
+        /// infiltração). Texto, e não enum, para aceitar as opções personalizadas
+        /// do catálogo, como já ocorre em <see cref="Vistoria.TipificacaoOcorrencia"/>.
+        /// </summary>
+        public List<string> TipificacaoInicial { get; set; } = new();
+
         public GrauRisco GrauRiscoInicial { get; set; }
 
         // ── Triagem operacional ──────────────────────────────────────────────────

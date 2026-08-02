@@ -27,7 +27,9 @@ namespace SIG_Defesa_Civil.API.Helper
                 { "DESCRICAO",      ocorrencia.DescricaoProblema },
 
                 // Classificação de risco (Etapa 2 — pode estar vazia)
-                { "TIPO_RISCO",      av?.TipificacaoInicial.ToString() ?? "Não classificado" },
+                { "TIPO_RISCO",      av != null && av.TipificacaoInicial.Count > 0
+                                        ? string.Join(", ", av.TipificacaoInicial)
+                                        : "Não classificado" },
                 { "GRAU_RISCO",      av?.GrauRiscoInicial.ToString()   ?? "Não avaliado" },
                 { "EMERGENCIA",      av?.Emergencia == true ? "Sim" : "Não" },
 

@@ -28,12 +28,17 @@ namespace SIG_Defesa_Civil.API.Data.Models.Tabelas
         /// </summary>
         public string CaminhoRelativo { get; set; } = string.Empty;
         public long TamanhoBytes { get; set; }
-        public int EnviadoPorUserId { get; set; }
+
+        /// <summary>
+        /// Colaborador que enviou o arquivo. Nulo nos anexos da abertura pública,
+        /// enviados pelo próprio cidadão — que não possui conta no sistema.
+        /// </summary>
+        public int? EnviadoPorUserId { get; set; }
 
         public DateTime EnviadoEm { get; set; }
 
         // Navegação
         public Ocorrencia Ocorrencia { get; set; } = null!;
-        public Usuario Usuario { get; set; } = null!;
+        public Usuario? Usuario { get; set; }
     }
 }

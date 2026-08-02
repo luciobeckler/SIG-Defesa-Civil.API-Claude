@@ -56,17 +56,30 @@ namespace SIG_Defesa_Civil.API.Data.Models
                 entity.HasIndex(o => o.AbertaEm);
                 entity.HasIndex(o => o.DeletedAt); // filtrar soft-deleted eficientemente
 
-                // FK: Solicitante (cidadão)
-                entity.HasOne(o => o.Solicitante)
-                    .WithMany()
-                    .HasForeignKey(o => o.SolicitanteId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                // Solicitante: owned — colunas na própria tabela, sem FK para usuarios.
+                // Cidadãos não têm conta no sistema (abertura é endpoint público).
+                entity.OwnsOne(o => o.Solicitante, sol =>
+                {
+                    sol.Property(s => s.Nome).HasColumnName("SolicitanteNome")
+                       .HasMaxLength(200).IsRequired();
+                    sol.Property(s => s.Cpf).HasColumnName("SolicitanteCpf").HasMaxLength(11);
+                    sol.Property(s => s.Rg).HasColumnName("SolicitanteRg").HasMaxLength(20);
+                    sol.Property(s => s.OrgaoEmissor).HasColumnName("SolicitanteOrgaoEmissor").HasMaxLength(20);
+                    sol.Property(s => s.Email).HasColumnName("SolicitanteEmail").HasMaxLength(200);
+                    // 50: a planilha histórica traz mais de um número no mesmo campo
+                    sol.Property(s => s.Telefone).HasColumnName("SolicitanteTelefone").HasMaxLength(50);
+                    sol.Property(s => s.Celular).HasColumnName("SolicitanteCelular").HasMaxLength(50);
 
-                // FK: Quem criou o registro no sistema
+                    // Filtro "início do CPF" na listagem
+                    sol.HasIndex(s => s.Cpf);
+                });
+                entity.Navigation(o => o.Solicitante).IsRequired();
+
+                // FK: Quem criou o registro no sistema (nulo = aberta pelo portal público)
                 entity.HasOne(o => o.CriadoPor)
                     .WithMany()
                     .HasForeignKey(o => o.CriadoPorId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                    .OnDelete(DeleteBehavior.SetNull);
 
                 // FK: Quem realizou o soft-delete (nullable)
                 entity.HasOne(o => o.ExcluidoPor)
@@ -111,10 +124,11 @@ namespace SIG_Defesa_Civil.API.Data.Models
                     .HasForeignKey(a => a.OcorrenciaId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                // Nulo nos anexos enviados pelo cidadão na abertura pública
                 entity.HasOne(a => a.Usuario)
                     .WithMany()
                     .HasForeignKey(a => a.EnviadoPorUserId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // ═══════════════════════════════════════════════════════════════════════
@@ -123,6 +137,13 @@ namespace SIG_Defesa_Civil.API.Data.Models
             modelBuilder.Entity<LogAcessoLgpd>(entity =>
             {
                 entity.Property(l => l.Acao).HasConversion<string>();
+
+                // Nulo quando a ação partiu do portal público (sem usuário autenticado)
+                entity.HasOne(l => l.Usuario)
+                    .WithMany()
+                    .HasForeignKey(l => l.UsuarioId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
                 entity.HasIndex(l => l.UsuarioId);
                 entity.HasIndex(l => l.OcorrenciaId);
                 entity.HasIndex(l => l.RegistradoEm);
@@ -133,7 +154,7 @@ namespace SIG_Defesa_Civil.API.Data.Models
             // ═══════════════════════════════════════════════════════════════════════
             modelBuilder.Entity<AvaliacaoRisco>(entity =>
             {
-                entity.Property(a => a.TipificacaoInicial).HasConversion<string>();
+                // TipificacaoInicial é text[] (multi-seleção) — sem conversão de enum
                 entity.Property(a => a.GrauRiscoInicial).HasConversion<string>();
 
                 entity.HasOne(a => a.Ocorrencia)

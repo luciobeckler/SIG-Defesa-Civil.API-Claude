@@ -6,7 +6,7 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
     public class AvaliacaoRiscoDto
     {
         public int Id { get; set; }
-        public TipificacaoOcorrencia TipificacaoInicial { get; set; }
+        public List<string> TipificacaoInicial { get; set; } = new();
         public GrauRisco GrauRiscoInicial { get; set; }
         public string? NomeAgenteTriage { get; set; }
         public string? RequisicaoSetorDocumento { get; set; }

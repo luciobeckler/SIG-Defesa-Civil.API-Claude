@@ -39,7 +39,6 @@ namespace SIG_Defesa_Civil.API.Services.Relatorio
         public async Task<string> GerarRelatorioAsync(int ocorrenciaId, int vistoriaId, int usuarioId)
         {
             var ocorrencia = await _context.Ocorrencias
-                .Include(o => o.Solicitante)
                 .Include(o => o.Localizacao)
                 .Include(o => o.AvaliacaoRisco)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)

@@ -2,10 +2,22 @@
 
 namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
 {
+    /// <summary>
+    /// Recorte da listagem entre trabalho em andamento e arquivo.
+    /// ATIVAS = tudo que ainda exige ação; ARQUIVO = encerradas e canceladas.
+    /// </summary>
+    public enum SituacaoOcorrencia { ATIVAS, ARQUIVO }
+
     /// <summary>Filtros opcionais para listagem de ocorrências.</summary>
     public class FiltroOcorrenciaDto
     {
         public StatusOcorrencia? Status { get; set; }
+
+        /// <summary>
+        /// Separa o fluxo vivo do arquivo. Null = todas.
+        /// Combinável com <see cref="Status"/> (usado pelas colunas do kanban).
+        /// </summary>
+        public SituacaoOcorrencia? Situacao { get; set; }
 
         /// <summary>Filtra pelo grau de risco da avaliação inicial (Etapa 2).</summary>
         public GrauRisco? GrauRiscoInicial { get; set; }

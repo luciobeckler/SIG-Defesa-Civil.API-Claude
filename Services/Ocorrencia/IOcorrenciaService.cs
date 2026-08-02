@@ -65,6 +65,12 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         /// Revela dados sensíveis de uma ocorrência.
         /// CRÍTICO: grava log obrigatório em log_acesso_lgpd dentro de transação.
         /// </summary>
+        /// <summary>
+        /// Contagem de ocorrências por status, respeitando os mesmos filtros da
+        /// listagem. Usado pelas abas (Ativas/Histórico) e pelo kanban.
+        /// </summary>
+        Task<ResumoOcorrenciasDto> ObterResumoAsync(FiltroOcorrenciaDto? filtros = null);
+
         Task<OcorrenciaDadosSensiveisDto> RevelarDadosSensiveisAsync(
             int ocorrenciaId,
             RevelarDadosRequest request,

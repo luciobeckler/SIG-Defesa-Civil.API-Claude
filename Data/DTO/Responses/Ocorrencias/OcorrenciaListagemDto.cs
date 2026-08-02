@@ -1,4 +1,4 @@
-﻿using SIG_Defesa_Civil.API.Data.DTO.Responses.Usuairos;
+using SIG_Defesa_Civil.API.Data.DTO.Responses.Usuairos;
 using SIG_Defesa_Civil.API.Enums;
 
 namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
@@ -21,7 +21,7 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
 
         // ── Etapa 2 (resumo) ──────────────────────────────────────────────────────
         public GrauRisco? GrauRiscoInicial { get; set; }
-        public TipificacaoOcorrencia? TipificacaoInicial { get; set; }
+        public List<string> TipificacaoInicial { get; set; } = new();
         public bool? Emergencia { get; set; }
 
         // ── Risco efetivo ─────────────────────────────────────────────────────────

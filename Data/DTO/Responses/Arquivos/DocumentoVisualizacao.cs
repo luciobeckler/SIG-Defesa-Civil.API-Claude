@@ -8,7 +8,8 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Arquivos
         public TipoArquivo TipoArquivo { get; set; }
         public string CaminhoRelativo { get; set; } = string.Empty;
         public long TamanhoBytes { get; set; }
-        public int EnviadoPorUserId { get; set; }
+        /// <summary>Nulo nos anexos enviados pelo cidadão na abertura pública.</summary>
+        public int? EnviadoPorUserId { get; set; }
         public DateTime EnviadoEm { get; set; }
     }
 }

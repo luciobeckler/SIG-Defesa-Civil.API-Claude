@@ -43,11 +43,20 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             {
                 _logger.LogInformation("Iniciando criação de ocorrência para cidadão {Cpf}", request.Cidadao.Cpf);
 
-                // 1. Buscar ou criar o solicitante a partir do CPF.
-                //    Cidadãos não possuem conta prévia — o registro é criado/atualizado
-                //    automaticamente. O Id obtido aqui é usado como CriadoPorId e
-                //    EnviadoPorUserId, pois o próprio cidadão é o autor da solicitação.
-                var solicitante = await GetOrCreateSolicitanteAsync(request.Cidadao);
+                // 1. Montar os dados do solicitante. Cidadãos não possuem conta —
+                //    os dados ficam na própria ocorrência, congelados no momento da
+                //    abertura. Como a abertura é pública, não há usuário autenticado:
+                //    CriadoPorId e EnviadoPorUserId ficam nulos.
+                var solicitante = new Data.Entities.Tabelas.Ocorrencia.SolicitanteOcorrencia
+                {
+                    Nome = request.Cidadao.Nome,
+                    Cpf = SomenteDigitos(request.Cidadao.Cpf),
+                    Rg = request.Cidadao.Rg,
+                    OrgaoEmissor = request.Cidadao.OrgaoEmissor,
+                    Email = request.Cidadao.Email,
+                    Telefone = request.Cidadao.Telefone,
+                    Celular = request.Cidadao.Celular
+                };
 
                 // 2. Gerar protocolo via sequence PostgreSQL
                 var numeroSequence = await ObterProximoNumeroSequenceAsync();
@@ -58,10 +67,10 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 var ocorrencia = new Data.Entities.Tabelas.Ocorrencia.Ocorrencia
                 {
                     Protocolo = protocolo,
-                    SolicitanteId = solicitante.Id,
+                    Solicitante = solicitante,
                     DescricaoProblema = request.DescricaoProblema,
                     Status = StatusOcorrencia.ABERTA,
-                    CriadoPorId = solicitante.Id,   // cidadão == autor da solicitação
+                    CriadoPorId = null,   // abertura pública — sem usuário autenticado
                     AbertaEm = DateTime.UtcNow,
                     AtualizadoEm = DateTime.UtcNow
                 };
@@ -124,7 +133,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         TipoArquivo = arquivoOriginal.TipoArquivo.ToString(),
                         CaminhoRelativo = caminhoRelativo,
                         TamanhoBytes = arquivoOriginal.File.Length,
-                        EnviadoPorUserId = solicitante.Id,
+                        EnviadoPorUserId = null,   // enviado pelo cidadão na abertura pública
                         EnviadoEm = DateTime.UtcNow
                     });
                 }
@@ -135,8 +144,9 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 _logger.LogInformation(
                     "Ocorrência {Protocolo} criada com {Count} arquivo(s)", protocolo, caminhos.Count);
 
-                // 7. Log LGPD fora da transação (não pode bloquear o fluxo)
-                await RegistrarLogLgpdAsync(solicitante.Id, ocorrencia.Id, AcaoLgpd.CRIOU);
+                // 7. Log LGPD fora da transação (não pode bloquear o fluxo).
+                //    Sem usuário: a abertura partiu do próprio cidadão pelo portal.
+                await RegistrarLogLgpdAsync(null, ocorrencia.Id, AcaoLgpd.CRIOU);
 
                 return new OcorrenciaCriadaDto
                 {
@@ -164,7 +174,6 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         public async Task<OcorrenciaDetalheDto> ObterDetalhesAsync(int ocorrenciaId)
         {
             var ocorrencia = await _context.Ocorrencias
-                .Include(o => o.Solicitante)
                 .Include(o => o.CriadoPor)
                 .Include(o => o.Localizacao)
                 .Include(o => o.AvaliacaoRisco).ThenInclude(a => a!.AbertaPorUsuario)
@@ -202,8 +211,9 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
 
             if (request.Cidadao != null)
             {
-                var solicitante = await _context.Usuarios.FindAsync(ocorrencia.SolicitanteId)!;
-                solicitante!.Nome = request.Cidadao.Nome ?? solicitante.Nome;
+                // Altera apenas esta ocorrência — os dados são um retrato da abertura
+                var solicitante = ocorrencia.Solicitante;
+                solicitante.Nome = request.Cidadao.Nome ?? solicitante.Nome;
                 solicitante.Email = request.Cidadao.Email ?? solicitante.Email;
                 solicitante.Telefone = request.Cidadao.Telefone ?? solicitante.Telefone;
                 solicitante.Celular = request.Cidadao.Celular ?? solicitante.Celular;
@@ -283,7 +293,6 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             var cpfNormalizado = new string(cpf.Where(char.IsDigit).ToArray());
 
             var ocorrencia = await _context.Ocorrencias
-                .Include(o => o.Solicitante)
                 .Include(o => o.CriadoPor)
                 .Include(o => o.Localizacao)
                 .Include(o => o.AvaliacaoRisco).ThenInclude(a => a!.AbertaPorUsuario)
@@ -323,7 +332,6 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             try
             {
                 var query = _context.Ocorrencias
-                    .Include(o => o.Solicitante)
                     .Include(o => o.Localizacao)
                     .Include(o => o.AvaliacaoRisco)
                     .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
@@ -353,7 +361,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     {
                         Nome = MascaramentoHelper.MascararNome(o.Solicitante.Nome),
                         Cpf = MascaramentoHelper.MascararCpf(o.Solicitante.Cpf ?? string.Empty),
-                        Email = MascaramentoHelper.MascararEmail(o.Solicitante.Email),
+                        Email = MascaramentoHelper.MascararEmail(o.Solicitante.Email ?? string.Empty),
                         Telefone = MascaramentoHelper.MascararTelefone(o.Solicitante.Telefone ?? string.Empty)
                     },
 
@@ -361,7 +369,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     Cidade = o.Localizacao?.Cidade ?? string.Empty,
 
                     GrauRiscoInicial = o.AvaliacaoRisco?.GrauRiscoInicial,
-                    TipificacaoInicial = o.AvaliacaoRisco?.TipificacaoInicial,
+                    TipificacaoInicial = o.AvaliacaoRisco?.TipificacaoInicial ?? new(),
                     Emergencia = o.AvaliacaoRisco?.Emergencia,
 
                     GrauRiscoEfetivo = o.Vistorias.Any()
@@ -382,6 +390,38 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 _logger.LogError(ex, "Erro ao listar ocorrências mascaradas");
                 throw new InvalidOperationException("Erro ao listar ocorrências", ex);
             }
+        }
+
+        public async Task<ResumoOcorrenciasDto> ObterResumoAsync(FiltroOcorrenciaDto? filtros = null)
+        {
+            var query = _context.Ocorrencias
+                .Where(o => o.DeletedAt == null)
+                .AsQueryable();
+
+            if (filtros != null)
+                query = AplicarFiltros(query, filtros);
+
+            // Uma única ida ao banco: agrupa por status e deriva os totais
+            var contagens = await query
+                .GroupBy(o => o.Status)
+                .Select(g => new { Status = g.Key, Qtd = g.Count() })
+                .ToListAsync();
+
+            var arquivados = new[] { StatusOcorrencia.ENCERRADA, StatusOcorrencia.CANCELADA };
+
+            var resumo = new ResumoOcorrenciasDto
+            {
+                Total = contagens.Sum(c => c.Qtd),
+                Arquivo = contagens.Where(c => arquivados.Contains(c.Status)).Sum(c => c.Qtd),
+                PorStatus = contagens.ToDictionary(c => c.Status.ToString(), c => c.Qtd),
+            };
+            resumo.Ativas = resumo.Total - resumo.Arquivo;
+
+            // Garante chave para todos os status, mesmo com contagem zero
+            foreach (var s in Enum.GetValues<StatusOcorrencia>())
+                resumo.PorStatus.TryAdd(s.ToString(), 0);
+
+            return resumo;
         }
 
         public async Task<OcorrenciaDadosSensiveisDto> RevelarDadosSensiveisAsync(
@@ -410,7 +450,6 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         "Cidadãos não têm permissão para acessar dados sensíveis de outras ocorrências");
 
                 var ocorrencia = await _context.Ocorrencias
-                    .Include(o => o.Solicitante)
                     .Include(o => o.Localizacao)
                     .Include(o => o.AvaliacaoRisco)
                     .Include(o => o.Arquivos)
@@ -450,7 +489,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         Cpf = ocorrencia.Solicitante.Cpf ?? string.Empty,
                         Rg = ocorrencia.Solicitante.Rg,
                         OrgaoEmissor = ocorrencia.Solicitante.OrgaoEmissor,
-                        Email = ocorrencia.Solicitante.Email,
+                        Email = ocorrencia.Solicitante.Email ?? string.Empty,
                         Telefone = ocorrencia.Solicitante.Telefone,
                         Celular = ocorrencia.Solicitante.Celular
                     },
@@ -470,7 +509,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                     },
 
                     GrauRiscoInicial = ocorrencia.AvaliacaoRisco?.GrauRiscoInicial,
-                    TipificacaoInicial = ocorrencia.AvaliacaoRisco?.TipificacaoInicial,
+                    TipificacaoInicial = ocorrencia.AvaliacaoRisco?.TipificacaoInicial ?? new(),
 
                     UltimoAcesso = new AcessoLgpdDto
                     {
@@ -785,7 +824,6 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             var cpfNormalizado = new string(cpf.Where(char.IsDigit).ToArray());
 
             var ocorrencia = await _context.Ocorrencias
-                .Include(o => o.Solicitante)
                 .Include(o => o.Arquivos)
                 .Where(o => o.DeletedAt == null)
                 .FirstOrDefaultAsync(o => o.Protocolo == protocolo)
@@ -828,6 +866,14 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             if (filtros.Status.HasValue)
                 query = query.Where(o => o.Status == filtros.Status.Value);
 
+            // Recorte fluxo vivo × arquivo (abas Ativas / Histórico)
+            if (filtros.Situacao == SituacaoOcorrencia.ATIVAS)
+                query = query.Where(o => o.Status != StatusOcorrencia.ENCERRADA
+                                      && o.Status != StatusOcorrencia.CANCELADA);
+            else if (filtros.Situacao == SituacaoOcorrencia.ARQUIVO)
+                query = query.Where(o => o.Status == StatusOcorrencia.ENCERRADA
+                                      || o.Status == StatusOcorrencia.CANCELADA);
+
             if (filtros.GrauRiscoInicial.HasValue)
                 query = query.Where(o => o.AvaliacaoRisco != null &&
                                          o.AvaliacaoRisco.GrauRiscoInicial == filtros.GrauRiscoInicial.Value);
@@ -858,7 +904,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             {
                 var prefixo = new string(filtros.CpfInicio.Where(char.IsDigit).ToArray());
                 if (prefixo.Length > 0)
-                    query = query.Where(o => o.Solicitante != null &&
+                    query = query.Where(o => o.Solicitante.Cpf != null &&
                                              o.Solicitante.Cpf.StartsWith(prefixo));
             }
 
@@ -878,7 +924,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 {
                     Nome = MascaramentoHelper.MascararNome(o.Solicitante.Nome),
                     Cpf = MascaramentoHelper.MascararCpf(o.Solicitante.Cpf ?? string.Empty),
-                    Email = MascaramentoHelper.MascararEmail(o.Solicitante.Email),
+                    Email = MascaramentoHelper.MascararEmail(o.Solicitante.Email ?? string.Empty),
                     Telefone = MascaramentoHelper.MascararTelefone(o.Solicitante.Telefone ?? string.Empty)
                 },
 
@@ -1027,48 +1073,18 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         EnviadoEm       = a.EnviadoEm
                     }).ToList(),
 
-                CriadoPor = o.CriadoPor.Nome,
+                // Nulo quando a ocorrência veio do portal público (sem usuário autenticado)
+                CriadoPor = o.CriadoPor?.Nome,
                 AbertaEm = o.AbertaEm,
                 AtualizadoEm = o.AtualizadoEm
             };
         }
 
-        private async Task<Usuario> GetOrCreateSolicitanteAsync(
-            Data.DTO.Requests.Usuarios.CidadaoDto dto)
-        {
-            var existente = await _context.Usuarios
-                .FirstOrDefaultAsync(u => u.Cpf == dto.Cpf);
-
-            if (existente != null)
-            {
-                existente.Nome = dto.Nome;
-                existente.Email = dto.Email;
-                existente.Telefone = dto.Telefone;
-                existente.Celular = dto.Celular;
-                existente.Rg = dto.Rg;
-                existente.OrgaoEmissor = dto.OrgaoEmissor;
-                await _context.SaveChangesAsync();
-                return existente;
-            }
-
-            var novo = new Usuario
-            {
-                Nome = dto.Nome,
-                Email = dto.Email,
-                Cpf = dto.Cpf,
-                Rg = dto.Rg,
-                OrgaoEmissor = dto.OrgaoEmissor,
-                Telefone = dto.Telefone,
-                Celular = dto.Celular,
-                TipoUsuario = TipoUsuario.CIDADAO,
-                Ativo = true,
-                CriadoEm = DateTime.UtcNow
-            };
-
-            _context.Usuarios.Add(novo);
-            await _context.SaveChangesAsync();
-            return novo;
-        }
+        /// <summary>Mantém apenas os dígitos — usado para normalizar CPF antes de gravar/comparar.</summary>
+        private static string? SomenteDigitos(string? valor) =>
+            string.IsNullOrWhiteSpace(valor)
+                ? null
+                : new string(valor.Where(char.IsDigit).ToArray());
 
         private async Task<int> ObterProximoNumeroSequenceAsync()
         {
@@ -1091,7 +1107,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             }
         }
 
-        private async Task RegistrarLogLgpdAsync(int usuarioId, int ocorrenciaId, AcaoLgpd acao)
+        private async Task RegistrarLogLgpdAsync(int? usuarioId, int ocorrenciaId, AcaoLgpd acao)
         {
             try
             {

@@ -55,7 +55,8 @@ docker compose exec db psql -U defesacivil -d defesacivil -c \
 | GRAU_RISCO com variações | normalizado p/ enum; não mapeável → "Não constatado"/"Não informado" (catálogo) |
 | Campos sem fonte (edificação, estrutura…) | "Não informado" (opção do catálogo) |
 | VISTORIADORES (texto livre) | contas `VISTORIADOR` **desativadas** (V1/V2; excedentes na observação) |
-| Solicitante sem CPF | conta CIDADAO com e-mail placeholder `sol.<protocolo>@importado.local` |
+| Solicitante | gravado nas colunas `Solicitante*` da própria ocorrência — cidadãos **não** têm conta |
+| Solicitante sem e-mail | placeholder `sol.<protocolo>@importado.local` (ou `cid.<cpf>@…` quando há CPF) |
 | OBSERVAÇÃO / DESPACHOS / RESPOSTA / conclusão do relatório | concatenados em `Observacoes` da vistoria |
 
 Registros criados são atribuídos ao usuário de sistema

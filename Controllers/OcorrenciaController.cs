@@ -216,6 +216,7 @@ namespace SIG_Defesa_Civil.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<List<OcorrenciaListagemDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> ListarOcorrencias(
             [FromQuery] StatusOcorrencia? status,
+            [FromQuery] SituacaoOcorrencia? situacao,
             [FromQuery] GrauRisco? grauRisco,
             [FromQuery] bool? emergencia,
             [FromQuery] string? bairro,
@@ -232,6 +233,7 @@ namespace SIG_Defesa_Civil.API.Controllers
                 var filtros = new FiltroOcorrenciaDto
                 {
                     Status = status,
+                    Situacao = situacao,
                     GrauRiscoInicial = grauRisco,
                     Emergencia = emergencia,
                     Bairro = bairro,
@@ -256,6 +258,50 @@ namespace SIG_Defesa_Civil.API.Controllers
             catch (Exception ex)
             {
                 return ErroInterno(ex, _logger, "ListarOcorrencias");
+            }
+        }
+
+        /// <summary>
+        /// Contagem de ocorrências por status, com os mesmos filtros da listagem.
+        /// Alimenta os contadores das abas (Ativas/Histórico) e as colunas do kanban.
+        /// </summary>
+        /// <response code="200">Totais por status</response>
+        [HttpGet("resumo")]
+        [ProducesResponseType(typeof(ApiResponse<ResumoOcorrenciasDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ObterResumo(
+            [FromQuery] StatusOcorrencia? status,
+            [FromQuery] SituacaoOcorrencia? situacao,
+            [FromQuery] GrauRisco? grauRisco,
+            [FromQuery] bool? emergencia,
+            [FromQuery] string? bairro,
+            [FromQuery] string? protocolo,
+            [FromQuery] int? vistoriadorId,
+            [FromQuery] DateTime? dataInicio,
+            [FromQuery] DateTime? dataFim,
+            [FromQuery] string? cpfInicio)
+        {
+            try
+            {
+                var filtros = new FiltroOcorrenciaDto
+                {
+                    Status = status,
+                    Situacao = situacao,
+                    GrauRiscoInicial = grauRisco,
+                    Emergencia = emergencia,
+                    Bairro = bairro,
+                    Protocolo = protocolo,
+                    VistoriadorId = vistoriadorId,
+                    DataInicio = dataInicio,
+                    DataFim = dataFim,
+                    CpfInicio = cpfInicio
+                };
+
+                var resultado = await _ocorrenciaService.ObterResumoAsync(filtros);
+                return Ok(ApiResponse<ResumoOcorrenciasDto>.Success(resultado));
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, "ObterResumo");
             }
         }
 

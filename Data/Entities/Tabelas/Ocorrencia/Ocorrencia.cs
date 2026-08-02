@@ -18,8 +18,11 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         public string Protocolo { get; set; } = null!;
 
         // ── Etapa 1: Solicitante ─────────────────────────────────────────────────
-        public int SolicitanteId { get; set; }
-        public Usuario Solicitante { get; set; } = null!;
+        /// <summary>
+        /// Dados do cidadão gravados na própria ocorrência (owned). Cidadãos não
+        /// possuem conta — ver <see cref="SolicitanteOcorrencia"/>.
+        /// </summary>
+        public SolicitanteOcorrencia Solicitante { get; set; } = null!;
 
         // ── Etapa 1: Descrição do problema ───────────────────────────────────────
         public string DescricaoProblema { get; set; } = null!;
@@ -28,8 +31,12 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         public StatusOcorrencia Status { get; set; } = StatusOcorrencia.ABERTA;
 
         // ── Auditoria de criação ─────────────────────────────────────────────────
-        public int CriadoPorId { get; set; }
-        public Usuario CriadoPor { get; set; } = null!;
+        /// <summary>
+        /// Colaborador que registrou a ocorrência. Nulo quando a abertura veio do
+        /// portal público — nesse caso não há usuário autenticado.
+        /// </summary>
+        public int? CriadoPorId { get; set; }
+        public Usuario? CriadoPor { get; set; }
         public DateTime AbertaEm { get; set; } = DateTime.UtcNow;
         public DateTime AtualizadoEm { get; set; } = DateTime.UtcNow;
 

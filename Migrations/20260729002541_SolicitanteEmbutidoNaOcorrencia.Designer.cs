@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIG_Defesa_Civil.API.Data.Models;
@@ -12,9 +13,11 @@ using SIG_Defesa_Civil.API.Data.Models;
 namespace SIG_Defesa_Civil.API.Migrations
 {
     [DbContext(typeof(DefesaCivilContext))]
-    partial class DefesaCivilContextModelSnapshot : ModelSnapshot
+    [Migration("20260729002541_SolicitanteEmbutidoNaOcorrencia")]
+    partial class SolicitanteEmbutidoNaOcorrencia
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -55,9 +58,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<string>("RequisicaoSetorDocumento")
                         .HasColumnType("text");
 
-                    b.Property<List<string>>("TipificacaoInicial")
+                    b.Property<string>("TipificacaoInicial")
                         .IsRequired()
-                        .HasColumnType("text[]");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
