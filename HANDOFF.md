@@ -122,6 +122,129 @@ Login: `admin@defesacivil.sabara.mg.gov.br`.
 
 ---
 
+## 🔁 Recarga de produção só com 2026 (19/09/2026)
+
+Decisão do usuário: **derrubar o banco de produção** (`docker compose down -v`) e recarregar só a
+aba `OCORRENCIAS_2026` da planilha nova (`Downloads\PLANILHAS DE OCORRENCIAS (2).xlsx`).
+Os `import.sql`/scripts em `Desktop\TCC\Scripts` e a `PLANILHA_NORMALIZADA_v2` são da carga anterior.
+
+```bash
+cd Scripts/Importacao
+python normalizar_planilha.py "--entrada=C:\Users\lucio\Downloads\PLANILHAS DE OCORRENCIAS (2).xlsx" \
+  --abas=OCORRENCIAS_2026 "--depara=C:\Users\lucio\Desktop\TCC\PLANILHA_NORMALIZADA_v2.xlsx" \
+  "--saida=C:\Users\lucio\Desktop\TCC\PLANILHA_NORMALIZADA_2026.xlsx"
+python importar_normalizada.py "C:\Users\lucio\Desktop\TCC\PLANILHA_NORMALIZADA_2026.xlsx"
+```
+Resultado (ensaiado num PostgreSQL descartável + API real, endpoints 200): **775 ocorrências**
+(`2026-0001`…`2026-0775`), 707 agendamentos, 670 vistorias, 37 vistoriadores, 30 opções de catálogo.
+
+O que mudou nos scripts por causa da planilha nova:
+- A coluna `TIPIFICACAO_OCORRENCIA` de 2026 é quase sempre "AVALIAÇÃO DE RISCO" (descartada);
+  a tipificação real está em **`SUBTIPO DA OCORRÊNCIA`** e o tipo de risco em
+  **`CLASSIFICAÇÃO DE RISCO`** → viraram `TIPIFICACAO_*` e a nova coluna `TIPO_RISCO`.
+- Os **8 descartes de tipificação** agora estão no código (`DESCARTAR_TIPIFICACAO`) — antes foram
+  feitos à mão na v2 e um reprocessamento os traria de volta.
+- `--depara` herda o de-para de vistoriadores revisado; linhas da v2 que só repetiam o padrão
+  cedem lugar às correções de digitação (Joantas→Jonatas, Tasmin→Yasmin…).
+- Interdição de 2026 usa outro vocabulário ("NÃO INTERDITADO", "INTERDITADO", "INTERDIÇÃO PARCIAL").
+- 15 pedidos da aba 2026 datados de jan/fev de **2025** (erro de virada de ano) têm o ano corrigido.
+- `import.sql` começa com `SET client_encoding = 'UTF8'` — o psql do Windows lia como WIN1252.
+- `NOTIFICAÇÃO` em 2026 é "NÃO EMITIDA"/"AUSÊNCIA DO SOLICITANTE" → **0 notificados** é o dado real.
+
+**Carga de 2025 (19/09/2026, depois da de 2026, sem `--limpar`):** aba histórica, já finalizada.
+A aba RELATORIOS PRONTOS 2025 só existe na planilha original (`Downloads\PLANILHAS DE OCORRENCIAS.xlsx`).
+```bash
+python normalizar_planilha.py "--entrada=C:\Users\lucio\Downloads\PLANILHAS DE OCORRENCIAS (2).xlsx" \
+  --abas=OCORRENCIAS_2025 "--depara=C:\Users\lucio\Desktop\TCC\PLANILHA_NORMALIZADA_v2.xlsx" \
+  "--relatorios=C:\Users\lucio\Downloads\PLANILHAS DE OCORRENCIAS.xlsx" --encerrar \
+  "--saida=C:\Users\lucio\Desktop\TCC\PLANILHA_NORMALIZADA_2025.xlsx"
+python importar_normalizada.py "C:\Users\lucio\Desktop\TCC\PLANILHA_NORMALIZADA_2025.xlsx"
+```
+Em produção: 434 ocorrências (`2025-0001`…`2025-0434`, todas ENCERRADA), 380 vistorias, 256 notificados,
+233 encaminhamentos finais; 2026 intacto (hash conferido antes/depois). Total: 1.209 ocorrências.
+Novidades nos scripts: despachos/respostas/destinos vão para `encaminhamentos_finais` (enum guardado como
+índice `int[]`); moradores por grupo (antes "4 ADULTOS, 2 CRIANÇAS" virava 42); fissuras/rachaduras →
+TRINCAS; WhatsApp conta como EMAIL; observação de linha sem vistoria vai para a descrição.
+
+⚠️ Arquivos em disco ficam em `/arquivos/<protocolo>/...` e a aba Documentos lista as pastas **do
+disco**. Numa recarga, mover o conteúdo antigo de `/var/sig-defesa-civil/arquivos` (menos
+`templates`) — senão pastas de ocorrências antigas aparecem nas novas de mesmo protocolo.
+
+---
+
+## 📱 Offline por HTTP e APK Android (30/09/2026)
+
+**O bloqueio real do offline não era HTTPS, era uma chamada.** Medido num build servido em
+`http://192.168.100.167:8099` (origem insegura, igual em formato à de produção): `isSecureContext`
+false, `crypto.randomUUID` **undefined** (`TypeError` ao chamar), `getRandomValues` e `indexedDB`
+disponíveis, `serviceWorker` **ausente**. Como `local-database.service.ts` criava o `localId` com
+`crypto.randomUUID()`, a gravação da vistoria offline morria antes de persistir qualquer coisa.
+
+- Correção: `src/app/shared/utils/uuid.ts` (`uuidV4()` sobre `getRandomValues`), aplicada nos 4 usos
+  (1 em `local-database.service.ts`, 3 em `file-storage.service.ts`). Bundle de produção não contém
+  mais `randomUUID`. Em produção desde 01/10/2026 (`main-ZH2FCZIJ.js`;
+  backup `~/backups/www_antes_uuid_20261001_0119.tgz`).
+- Ainda **exige** contexto seguro, sem solução em código: abrir o sistema sem rede (service worker)
+  e a captura de localização no navegador.
+
+**APK Android** (`npx cap sync android` + `gradlew assembleDebug`): WebView serve de
+`https://localhost`, que é contexto seguro — resolve UUID, abertura offline e localização sem mexer
+no servidor.
+
+- `capacitor.config.ts`: appId `br.gov.sabara.defesacivil`, appName "Defesa Civil Sabara",
+  `android.allowMixedContent: true` (a API é HTTP e a página é https → conteúdo misto).
+- `android/app/src/main/res/xml/network_security_config.xml`: cleartext liberado **só** para
+  192.168.8.15 e 179.106.96.58; referenciado no manifesto.
+- Manifesto: permissões de localização, câmera e leitura de imagens (o formulário de abertura usa os
+  plugins nativos de câmera e geolocalização).
+- `ApiBaseService` + `apiBaseInterceptor`: no app instalado as chamadas `/api/...` recebem prefixo
+  absoluto, escolhido testando `environment.servidoresNativos` na ordem (IP interno, depois externo)
+  a cada retorno de rede. No navegador o prefixo é vazio e nada muda.
+- APK publicado em `~/app/www/app/defesa-civil-sabara-v1.0.apk` → baixável em
+  `http://179.106.96.58:8081/app/defesa-civil-sabara-v1.0.apk` (testado de fora, 9,68 MB, 200).
+  ⚠️ O deploy do frontend apaga `www/*`: **preservar ou recopiar `www/app/`** (ou usar
+  `rsync --exclude app`).
+- É build de depuração (assinada com a chave de debug): instala por sideload, mas para distribuição
+  ampla convém gerar uma chave de publicação — a senha dela fica com o usuário.
+
+---
+
+## ✍️ Assinatura dos vistoriadores (01/10/2026)
+
+Decisão do usuário: **uma assinatura por vistoriador** da equipe (até 4, com "quem assinou e quem
+falta" na tela) e **coleta também offline**. Pode ser feita depois de a vistoria estar registrada.
+
+Backend:
+- `TipoArquivo.ASSINATURA_VISTORIADOR` → mesma pasta `Assinaturas`.
+- `OcorrenciaService`: `SalvarAssinaturaVistoriadorAsync` valida que o vistoriador **está na equipe
+  daquela vistoria** (senão 400) e delega a `SalvarAssinaturaInternaAsync`, extraída da assinatura do
+  munícipe — as duas compartilham gravação e substituição por nome determinístico
+  (`assinatura_vistoriador_{vistoriadorId}_vistoria_{vistoriaId}.png`).
+- `POST /api/v1/ocorrencias/{id}/assinatura-vistoriador/{vistoriaId}/{vistoriadorId}` (multipart `arquivos`).
+- `VistoriaDto` ganhou `Vistoriador1Id..4Id`; o **detalhe interno** passou a carregar a equipe
+  (4 `ThenInclude`) e devolve ids, nomes e matrículas. `AcompanharAsync` (público) ficou **sem** a
+  equipe de propósito.
+
+Frontend:
+- `AssinaturaPendente { path, tipo, vistoriadorId? }` na fila offline; `assinaturaPath` antigo
+  continua sendo lido (aparelhos podem ter fila da versão anterior).
+- `VistoriaOfflineService.submitAssinaturaVistoriador()` (online direto, senão fila) e
+  `_enviarAssinatura` escolhe o endpoint conforme haja `vistoriadorId`.
+- Detalhe: bloco "Assinaturas da Equipe" com contador, "Assinado"/"Assinatura pendente" e botões
+  Ver/Assinar por pessoa.
+
+Ensaiado de ponta a ponta contra a API real (PostgreSQL descartável): 12 verificações, incluindo
+regressão da assinatura do munícipe, recusa de quem está fora da equipe e reassinatura sem duplicar
+linha em `arquivos` nem arquivo em disco.
+
+⚠️ O relatório `.docx` é **só texto** (placeholders): nenhuma assinatura entra nele, nem a do
+munícipe. Colocar imagem no relatório é mudança separada.
+
+⚠️ Chegar ao tablet exige **novo APK** (a tela é do frontend). A chave de publicação já existe
+(`android/keystore.properties`, fora do git), então a atualização instala por cima preservando dados.
+
+---
+
 ## ⏳ Pendências
 
 ### 1. ✅ RESOLVIDO — importador da planilha normalizada
@@ -151,7 +274,9 @@ Já corrigido automaticamente: `JOANATAS`→Jonatas, `PRICILLA`→Priscilla, `YA
 `PAULO R`→Paulo Rogerio, `LEANDRO S`→Leandro Santos, patentes (`SGT`) e cidades (`BH`, `(CONTAGEM)`).
 
 ### 3. Deploy em produção — roteiro acordado
-Servidor: `ssh luciobeckler@179.106.96.58`. App externo `http://179.106.96.58:8081/`.
+Servidor: `ssh luciobeckler@192.168.8.15` (interno) **ou** `luciobeckler@179.106.96.58` (externo) —
+verificado em 02/08/2026: **os dois respondem na porta 22**, mesmo com a máquina do usuário em
+outra faixa (`192.168.18.x`). App externo: `http://179.106.96.58:8081/`.
 **Pasta do projeto no servidor: `~/app`** (não `~/SIG-Defesa-Civil.API`).
 
 ⚠️ `~/app/.git` é **propriedade do root** (deploy anterior feito como root), enquanto `~/app`

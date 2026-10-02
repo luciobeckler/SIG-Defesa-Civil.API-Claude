@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SIG_Defesa_Civil.API.Data.DTO.Requests;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Arquivos;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
@@ -184,6 +184,10 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 .Include(o => o.Agendamentos).ThenInclude(a => a.AgendadoPor)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Tentativas)
                 .Include(o => o.Vistorias).ThenInclude(v => v.RegistradoPor)
+                .Include(o => o.Vistorias).ThenInclude(v => v.Vistoriador1)
+                .Include(o => o.Vistorias).ThenInclude(v => v.Vistoriador2)
+                .Include(o => o.Vistorias).ThenInclude(v => v.Vistoriador3)
+                .Include(o => o.Vistorias).ThenInclude(v => v.Vistoriador4)
                 .Include(o => o.Notificados).ThenInclude(n => n.RegistradoPor)
                 .Include(o => o.EncaminhamentoFinal).ThenInclude(e => e!.RelatorioVistoria)
                 .Include(o => o.EncaminhamentoFinal).ThenInclude(e => e!.RegistradoPor)
@@ -589,7 +593,46 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         // ASSINATURA DO MUNÍCIPE
         // ═══════════════════════════════════════════════════════════════════════════
 
-        public async Task SalvarAssinaturaAsync(int ocorrenciaId, int vistoriaId, IFormFile arquivo, int usuarioId)
+        public Task SalvarAssinaturaAsync(int ocorrenciaId, int vistoriaId, IFormFile arquivo, int usuarioId)
+            // Nome determinístico: identifica a assinatura de cada vistoria sem migration.
+            => SalvarAssinaturaInternaAsync(
+                ocorrenciaId, vistoriaId, TipoArquivo.ASSINATURA_MUNICIPIO,
+                $"assinatura_vistoria_{vistoriaId}.png", arquivo, usuarioId);
+
+        public async Task SalvarAssinaturaVistoriadorAsync(
+            int ocorrenciaId, int vistoriaId, int vistoriadorId, IFormFile arquivo, int usuarioId)
+        {
+            // A assinatura só vale para quem consta na equipe da vistoria: é o que dá
+            // sentido a "quem assinou e quem falta" e impede assinar no lugar de outro.
+            var equipe = await _context.Vistorias
+                .Where(v => v.Id == vistoriaId && v.OcorrenciaId == ocorrenciaId)
+                .Select(v => new[] { (int?)v.Vistoriador1Id, v.Vistoriador2Id, v.Vistoriador3Id, v.Vistoriador4Id })
+                .FirstOrDefaultAsync()
+                ?? throw new InvalidOperationException(
+                    $"Vistoria {vistoriaId} não encontrada para a ocorrência {ocorrenciaId}.");
+
+            if (!equipe.Contains(vistoriadorId))
+                throw new InvalidOperationException(
+                    $"O vistoriador {vistoriadorId} não faz parte da equipe da vistoria {vistoriaId}.");
+
+            await SalvarAssinaturaInternaAsync(
+                ocorrenciaId, vistoriaId, TipoArquivo.ASSINATURA_VISTORIADOR,
+                $"assinatura_vistoriador_{vistoriadorId}_vistoria_{vistoriaId}.png",
+                arquivo, usuarioId);
+        }
+
+        /// <summary>
+        /// Gravação comum às assinaturas (munícipe e vistoriadores): salva o PNG na pasta
+        /// de assinaturas da ocorrência e substitui o registro anterior de mesmo nome,
+        /// de modo que reassinar não acumule arquivos órfãos no banco.
+        /// </summary>
+        private async Task SalvarAssinaturaInternaAsync(
+            int ocorrenciaId,
+            int vistoriaId,
+            TipoArquivo tipo,
+            string nomeArquivo,
+            IFormFile arquivo,
+            int usuarioId)
         {
             var ocorrencia = await _context.Ocorrencias
                 .FirstOrDefaultAsync(o => o.Id == ocorrenciaId && o.DeletedAt == null)
@@ -602,9 +645,6 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 throw new InvalidOperationException(
                     $"Vistoria {vistoriaId} não encontrada para a ocorrência {ocorrenciaId}.");
 
-            // Nome determinístico: permite identificar a assinatura de cada vistoria sem migration
-            var nomeArquivo = $"assinatura_vistoria_{vistoriaId}.png";
-
             var ms = new MemoryStream();
             await arquivo.CopyToAsync(ms);
             ms.Position = 0;
@@ -614,18 +654,18 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             {
                 await _storageService.CriarEstruturaPastasAsync(ocorrencia.Protocolo);
                 caminho = await _storageService.SalvarArquivoAsync(
-                    ocorrencia.Protocolo, nomeArquivo, TipoArquivo.ASSINATURA_MUNICIPIO, ms);
+                    ocorrencia.Protocolo, nomeArquivo, tipo, ms);
             }
             finally
             {
                 await ms.DisposeAsync();
             }
 
-            // Remove assinatura anterior desta vistoria se existir
+            // Remove a assinatura anterior de mesmo nome, se existir
             var anterior = await _context.Arquivos
                 .FirstOrDefaultAsync(a =>
                     a.OcorrenciaId == ocorrenciaId &&
-                    a.TipoArquivo  == TipoArquivo.ASSINATURA_MUNICIPIO.ToString() &&
+                    a.TipoArquivo  == tipo.ToString() &&
                     a.NomeOriginal == nomeArquivo);
 
             if (anterior != null)
@@ -635,7 +675,7 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             {
                 OcorrenciaId     = ocorrenciaId,
                 NomeOriginal     = nomeArquivo,
-                TipoArquivo      = TipoArquivo.ASSINATURA_MUNICIPIO.ToString(),
+                TipoArquivo      = tipo.ToString(),
                 CaminhoRelativo  = caminho,
                 TamanhoBytes     = arquivo.Length,
                 EnviadoPorUserId = usuarioId,
@@ -645,8 +685,8 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
-                "Assinatura salva para vistoria {VistoriaId} da ocorrência {Protocolo} por usuário {UsuarioId}",
-                vistoriaId, ocorrencia.Protocolo, usuarioId);
+                "Assinatura {Tipo} ({Nome}) salva para vistoria {VistoriaId} da ocorrência {Protocolo} por usuário {UsuarioId}",
+                tipo, nomeArquivo, vistoriaId, ocorrencia.Protocolo, usuarioId);
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -1027,6 +1067,18 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                         Orientacoes = v.Orientacoes,
                         Observacoes = v.Observacoes,
                         EncaminhamentosDeCampo = v.EncaminhamentosDeCampo,
+                        Vistoriador1Id = v.Vistoriador1Id,
+                        Vistoriador2Id = v.Vistoriador2Id,
+                        Vistoriador3Id = v.Vistoriador3Id,
+                        Vistoriador4Id = v.Vistoriador4Id,
+                        NomeVistoriador1 = v.Vistoriador1?.Nome ?? string.Empty,
+                        MatriculaVistoriador1 = v.Vistoriador1?.Matricula,
+                        NomeVistoriador2 = v.Vistoriador2?.Nome,
+                        MatriculaVistoriador2 = v.Vistoriador2?.Matricula,
+                        NomeVistoriador3 = v.Vistoriador3?.Nome,
+                        MatriculaVistoriador3 = v.Vistoriador3?.Matricula,
+                        NomeVistoriador4 = v.Vistoriador4?.Nome,
+                        MatriculaVistoriador4 = v.Vistoriador4?.Matricula,
                         RegistradoPor = v.RegistradoPor.Nome,
                         RegistradoEm = v.RegistradoEm
                     }).ToList(),

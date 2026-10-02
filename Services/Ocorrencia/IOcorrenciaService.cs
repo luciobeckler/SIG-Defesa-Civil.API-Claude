@@ -108,6 +108,18 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         /// </summary>
         Task SalvarAssinaturaAsync(int ocorrenciaId, int vistoriaId, IFormFile arquivo, int usuarioId);
 
+        // ── Assinatura dos vistoriadores ─────────────────────────────────────────
+
+        /// <summary>
+        /// Salva a assinatura de um dos vistoriadores que conduziram a vistoria (PNG do
+        /// canvas). Tipo de arquivo: ASSINATURA_VISTORIADOR. Cada vistoriador da equipe
+        /// tem a sua; reassinar substitui apenas a dele.
+        /// Lança <see cref="InvalidOperationException"/> se a vistoria não pertencer à
+        /// ocorrência ou se o vistoriador não estiver na equipe daquela vistoria.
+        /// </summary>
+        Task SalvarAssinaturaVistoriadorAsync(
+            int ocorrenciaId, int vistoriaId, int vistoriadorId, IFormFile arquivo, int usuarioId);
+
         // ── Central de Documentos ────────────────────────────────────────────────
 
         /// <summary>

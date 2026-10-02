@@ -1,4 +1,4 @@
-using SIG_Defesa_Civil.API.Enums;
+﻿using SIG_Defesa_Civil.API.Enums;
 
 namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
 {
@@ -52,6 +52,10 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public List<string> EncaminhamentosDeCampo { get; set; } = new();
 
         // Equipe executora
+        public int Vistoriador1Id { get; set; }
+        public int? Vistoriador2Id { get; set; }
+        public int? Vistoriador3Id { get; set; }
+        public int? Vistoriador4Id { get; set; }
         public string NomeVistoriador1 { get; set; } = string.Empty;
         public string? MatriculaVistoriador1 { get; set; }
         public string? NomeVistoriador2 { get; set; }

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia;
@@ -616,6 +616,10 @@ namespace SIG_Defesa_Civil.API.Services.Vistoria
             Orientacoes = v.Orientacoes,
             Observacoes = v.Observacoes,
             EncaminhamentosDeCampo = v.EncaminhamentosDeCampo,
+            Vistoriador1Id = v.Vistoriador1Id,
+            Vistoriador2Id = v.Vistoriador2Id,
+            Vistoriador3Id = v.Vistoriador3Id,
+            Vistoriador4Id = v.Vistoriador4Id,
             NomeVistoriador1 = v.Vistoriador1.Nome,
             MatriculaVistoriador1 = v.Vistoriador1.Matricula,
             NomeVistoriador2 = v.Vistoriador2?.Nome,

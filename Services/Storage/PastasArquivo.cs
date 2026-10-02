@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using SIG_Defesa_Civil.API.Enums;
 
 namespace SIG_Defesa_Civil.API.Services.Storage
@@ -21,6 +21,7 @@ namespace SIG_Defesa_Civil.API.Services.Storage
                 [TipoArquivo.RELATORIO_FINAL]        = "Relatorios_Finais",
                 [TipoArquivo.RELATORIO_ASSINADO]     = "Relatorios_Assinados",
                 [TipoArquivo.ASSINATURA_MUNICIPIO]   = "Assinaturas",
+                [TipoArquivo.ASSINATURA_VISTORIADOR] = "Assinaturas",
             };
 
         public static string De(TipoArquivo tipo) => PorTipo[tipo];

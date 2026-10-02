@@ -4,7 +4,7 @@
     public enum TipoUsuario { CIDADAO, ATENDENTE, VISTORIADOR, ADMIN }
 
     // ─── Arquivos ────────────────────────────────────────────────────────────────
-    public enum TipoArquivo { FOTO_CIDADAO, COMPROVANTE_RESIDENCIA, FICHA_VISTORIA, FOTO_CAMPO, RELATORIO_FINAL, RELATORIO_ASSINADO, ASSINATURA_MUNICIPIO }
+    public enum TipoArquivo { FOTO_CIDADAO, COMPROVANTE_RESIDENCIA, FICHA_VISTORIA, FOTO_CAMPO, RELATORIO_FINAL, RELATORIO_ASSINADO, ASSINATURA_MUNICIPIO, ASSINATURA_VISTORIADOR }
 
     // ─── LGPD ────────────────────────────────────────────────────────────────────
     public enum AcaoLgpd { VISUALIZOU, BAIXOU, EDITOU, EXCLUIU, CRIOU }

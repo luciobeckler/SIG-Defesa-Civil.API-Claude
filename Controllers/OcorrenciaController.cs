@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using SIG_Defesa_Civil.API.Data.DTO.Requests;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Arquivos;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
@@ -846,6 +846,83 @@ namespace SIG_Defesa_Civil.API.Controllers
             catch (Exception ex)
             {
                 return ErroInterno(ex, _logger, $"SalvarAssinatura({id})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // POST /api/v1/ocorrencias/{id}/assinatura-vistoriador/{vistoriaId}/{vistoriadorId}
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Salva a assinatura de um vistoriador da equipe que conduziu a vistoria.
+        /// Cada vistoriador designado tem a sua assinatura; reassinar substitui a dele.
+        /// Pode ser coletada depois de a vistoria estar registrada.
+        /// </summary>
+        /// <param name="id">ID da ocorrência</param>
+        /// <param name="vistoriaId">ID da vistoria</param>
+        /// <param name="vistoriadorId">ID do vistoriador que está assinando</param>
+        /// <param name="arquivos">Imagem PNG da assinatura (max 2 MB)</param>
+        /// <response code="201">Assinatura salva com sucesso</response>
+        /// <response code="400">Arquivo ausente, muito grande ou vistoriador fora da equipe</response>
+        /// <response code="404">Ocorrência ou vistoria não encontrada</response>
+        /// <response code="503">Falha no armazenamento</response>
+        [HttpPost("{id:int}/assinatura-vistoriador/{vistoriaId:int}/{vistoriadorId:int}")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> SalvarAssinaturaVistoriador(
+            [FromRoute] int id,
+            [FromRoute] int vistoriaId,
+            [FromRoute] int vistoriadorId,
+            [FromForm] List<IFormFile>? arquivos)
+        {
+            var arquivo = arquivos?.FirstOrDefault();
+
+            try
+            {
+                if (arquivo == null || arquivo.Length == 0)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "Nenhuma assinatura enviada.",
+                        ErrosRequisicoes.ARQUIVOS_AUSENTES));
+
+                const long maxSize = 2 * 1024 * 1024; // 2 MB
+                if (arquivo.Length > maxSize)
+                    return BadRequest(ApiResponse<object>.Error(
+                        "Arquivo de assinatura excede o tamanho máximo de 2 MB.",
+                        ErrosRequisicoes.ARQUIVO_MUITO_GRANDE));
+
+                await _ocorrenciaService.SalvarAssinaturaVistoriadorAsync(
+                    id, vistoriaId, vistoriadorId, arquivo, ObterUsuarioIdInterno());
+
+                return StatusCode(
+                    StatusCodes.Status201Created,
+                    ApiResponse<object>.Success(null, "Assinatura do vistoriador salva com sucesso."));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrada"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Vistoriador fora da equipe da vistoria
+                return BadRequest(ApiResponse<object>.Error(
+                    ex.Message, ErrosRequisicoes.VALIDACAO_FALHOU));
+            }
+            catch (StorageException ex)
+            {
+                _logger.LogError(ex,
+                    "Falha de armazenamento ao salvar assinatura do vistoriador {VistoriadorId}", vistoriadorId);
+                return StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
+                    ApiResponse<object>.Error(
+                        "Sistema temporariamente indisponível. Tente novamente em alguns minutos.",
+                        ErrosRequisicoes.UPLOAD_FAILED));
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"SalvarAssinaturaVistoriador({id})");
             }
         }
 
