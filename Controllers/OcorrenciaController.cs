@@ -808,6 +808,11 @@ namespace SIG_Defesa_Civil.API.Controllers
                     ? NoContent()
                     : Ok(ApiResponse<RascunhoVistoriaDto>.Success(rascunho));
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ApiResponse<object>.Error(
+                    ex.Message, ErrosRequisicoes.ACESSO_NEGADO));
+            }
             catch (Exception ex)
             {
                 return ErroInterno(ex, _logger, $"ObterRascunhoVistoria({id})");
@@ -836,6 +841,11 @@ namespace SIG_Defesa_Civil.API.Controllers
             {
                 return NaoEncontrado(ex.Message);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ApiResponse<object>.Error(
+                    ex.Message, ErrosRequisicoes.ACESSO_NEGADO));
+            }
             catch (Exception ex)
             {
                 return ErroInterno(ex, _logger, $"SalvarRascunhoVistoria({id})");
@@ -853,6 +863,11 @@ namespace SIG_Defesa_Civil.API.Controllers
                 await _ocorrenciaService.DescartarRascunhoVistoriaAsync(
                     id, ObterUsuarioIdInterno());
                 return NoContent();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ApiResponse<object>.Error(
+                    ex.Message, ErrosRequisicoes.ACESSO_NEGADO));
             }
             catch (Exception ex)
             {
