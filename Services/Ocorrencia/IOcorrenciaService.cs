@@ -120,6 +120,23 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         Task SalvarAssinaturaVistoriadorAsync(
             int ocorrenciaId, int vistoriaId, int vistoriadorId, IFormFile arquivo, int usuarioId);
 
+        // ── Rascunho da vistoria ─────────────────────────────────────────────────
+
+        /// <summary>
+        /// Rascunho do formulário de vistoria daquele usuário, ou null se não houver.
+        /// </summary>
+        Task<RascunhoVistoriaDto?> ObterRascunhoVistoriaAsync(int ocorrenciaId, int usuarioId);
+
+        /// <summary>
+        /// Grava (ou substitui) o rascunho do usuário para a ocorrência. É chamado a
+        /// cada campo preenchido, então precisa ser barato e idempotente.
+        /// </summary>
+        Task<RascunhoVistoriaDto> SalvarRascunhoVistoriaAsync(
+            int ocorrenciaId, int usuarioId, string conteudoJson);
+
+        /// <summary>Descarta o rascunho (vistoria registrada ou descarte manual).</summary>
+        Task DescartarRascunhoVistoriaAsync(int ocorrenciaId, int usuarioId);
+
         // ── Central de Documentos ────────────────────────────────────────────────
 
         /// <summary>

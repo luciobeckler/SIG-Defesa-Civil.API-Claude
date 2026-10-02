@@ -1,4 +1,4 @@
-namespace SIG_Defesa_Civil.API.Data.Models
+﻿namespace SIG_Defesa_Civil.API.Data.Models
 {
     using Microsoft.EntityFrameworkCore;
     using SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia;
@@ -22,6 +22,7 @@ namespace SIG_Defesa_Civil.API.Data.Models
         public DbSet<AgendamentoVistoria> AgendamentosVistoria { get; set; }
         public DbSet<TentativaVistoria> TentativasVistoria { get; set; }
         public DbSet<Vistoria> Vistorias { get; set; }
+        public DbSet<RascunhoVistoria> RascunhosVistoria { get; set; }
         public DbSet<Notificado> Notificados { get; set; }
         public DbSet<EncaminhamentoFinal> EncaminhamentosFinais { get; set; }
         public DbSet<OpcaoCampoVistoria> OpcoesCampoVistoria { get; set; }
@@ -254,6 +255,28 @@ namespace SIG_Defesa_Civil.API.Data.Models
 
                 // Garante que o número da vistoria é único por ocorrência
                 entity.HasIndex(v => new { v.OcorrenciaId, v.Numero }).IsUnique();
+            });
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // RASCUNHO DA VISTORIA (preenchimento em andamento)
+            // ═══════════════════════════════════════════════════════════════════════
+            modelBuilder.Entity<RascunhoVistoria>(entity =>
+            {
+                entity.Property(r => r.ConteudoJson).HasColumnType("jsonb");
+
+                entity.HasOne(r => r.Ocorrencia)
+                    .WithMany()
+                    .HasForeignKey(r => r.OcorrenciaId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(r => r.Usuario)
+                    .WithMany()
+                    .HasForeignKey(r => r.UsuarioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Um rascunho por ocorrência e vistoriador: dois da equipe podem
+                // preencher em paralelo sem apagar o preenchimento um do outro.
+                entity.HasIndex(r => new { r.OcorrenciaId, r.UsuarioId }).IsUnique();
             });
 
             // ═══════════════════════════════════════════════════════════════════════

@@ -593,6 +593,67 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         // ASSINATURA DO MUNÍCIPE
         // ═══════════════════════════════════════════════════════════════════════════
 
+        // ── Rascunho da vistoria ─────────────────────────────────────────────────
+
+        public async Task<RascunhoVistoriaDto?> ObterRascunhoVistoriaAsync(int ocorrenciaId, int usuarioId)
+        {
+            var rascunho = await _context.RascunhosVistoria
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.OcorrenciaId == ocorrenciaId && r.UsuarioId == usuarioId);
+
+            return rascunho == null
+                ? null
+                : new RascunhoVistoriaDto
+                {
+                    ConteudoJson = rascunho.ConteudoJson,
+                    AtualizadoEm = rascunho.AtualizadoEm,
+                };
+        }
+
+        public async Task<RascunhoVistoriaDto> SalvarRascunhoVistoriaAsync(
+            int ocorrenciaId, int usuarioId, string conteudoJson)
+        {
+            var existe = await _context.Ocorrencias
+                .AnyAsync(o => o.Id == ocorrenciaId && o.DeletedAt == null);
+            if (!existe)
+                throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
+
+            var rascunho = await _context.RascunhosVistoria
+                .FirstOrDefaultAsync(r => r.OcorrenciaId == ocorrenciaId && r.UsuarioId == usuarioId);
+
+            if (rascunho == null)
+            {
+                rascunho = new Data.Entities.Tabelas.Ocorrencia.RascunhoVistoria
+                {
+                    OcorrenciaId = ocorrenciaId,
+                    UsuarioId = usuarioId,
+                };
+                _context.RascunhosVistoria.Add(rascunho);
+            }
+
+            rascunho.ConteudoJson = conteudoJson;
+            rascunho.AtualizadoEm = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return new RascunhoVistoriaDto
+            {
+                ConteudoJson = rascunho.ConteudoJson,
+                AtualizadoEm = rascunho.AtualizadoEm,
+            };
+        }
+
+        public async Task DescartarRascunhoVistoriaAsync(int ocorrenciaId, int usuarioId)
+        {
+            var rascunho = await _context.RascunhosVistoria
+                .FirstOrDefaultAsync(r => r.OcorrenciaId == ocorrenciaId && r.UsuarioId == usuarioId);
+
+            if (rascunho == null) return;   // já não existe: nada a fazer
+
+            _context.RascunhosVistoria.Remove(rascunho);
+            await _context.SaveChangesAsync();
+        }
+
         public Task SalvarAssinaturaAsync(int ocorrenciaId, int vistoriaId, IFormFile arquivo, int usuarioId)
             // Nome determinístico: identifica a assinatura de cada vistoria sem migration.
             => SalvarAssinaturaInternaAsync(

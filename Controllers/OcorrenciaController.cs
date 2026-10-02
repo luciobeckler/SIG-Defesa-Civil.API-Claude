@@ -784,6 +784,83 @@ namespace SIG_Defesa_Civil.API.Controllers
         }
 
         // ══════════════════════════════════════════════════════════════════════════
+        // RASCUNHO DA VISTORIA — GET / PUT / DELETE
+        // /api/v1/ocorrencias/{id}/rascunho-vistoria
+        //
+        // O formulário de campo é longo e o aplicativo pode ser recarregado no meio.
+        // O rascunho guarda o preenchimento sem criar vistoria nem mexer no status.
+        // ══════════════════════════════════════════════════════════════════════════
+
+        /// <summary>Rascunho da vistoria do usuário logado para esta ocorrência.</summary>
+        /// <response code="200">Rascunho encontrado</response>
+        /// <response code="204">Não há rascunho</response>
+        [HttpGet("{id:int}/rascunho-vistoria")]
+        [ProducesResponseType(typeof(ApiResponse<RascunhoVistoriaDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<IActionResult> ObterRascunhoVistoria([FromRoute] int id)
+        {
+            try
+            {
+                var rascunho = await _ocorrenciaService.ObterRascunhoVistoriaAsync(
+                    id, ObterUsuarioIdInterno());
+
+                return rascunho == null
+                    ? NoContent()
+                    : Ok(ApiResponse<RascunhoVistoriaDto>.Success(rascunho));
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"ObterRascunhoVistoria({id})");
+            }
+        }
+
+        /// <summary>Salva o preenchimento em andamento. Substitui o rascunho anterior.</summary>
+        /// <response code="200">Rascunho salvo</response>
+        /// <response code="404">Ocorrência não encontrada</response>
+        [HttpPut("{id:int}/rascunho-vistoria")]
+        [ProducesResponseType(typeof(ApiResponse<RascunhoVistoriaDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> SalvarRascunhoVistoria(
+            [FromRoute] int id,
+            [FromBody] SalvarRascunhoVistoriaRequest request)
+        {
+            try
+            {
+                var rascunho = await _ocorrenciaService.SalvarRascunhoVistoriaAsync(
+                    id, ObterUsuarioIdInterno(), request.ConteudoJson);
+
+                return Ok(ApiResponse<RascunhoVistoriaDto>.Success(
+                    rascunho, "Rascunho salvo."));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"SalvarRascunhoVistoria({id})");
+            }
+        }
+
+        /// <summary>Descarta o rascunho do usuário logado.</summary>
+        /// <response code="204">Descartado (ou já não existia)</response>
+        [HttpDelete("{id:int}/rascunho-vistoria")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<IActionResult> DescartarRascunhoVistoria([FromRoute] int id)
+        {
+            try
+            {
+                await _ocorrenciaService.DescartarRascunhoVistoriaAsync(
+                    id, ObterUsuarioIdInterno());
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"DescartarRascunhoVistoria({id})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
         // POST /api/v1/ocorrencias/{id}/assinatura/{vistoriaId} — Assinatura do Munícipe
         // ══════════════════════════════════════════════════════════════════════════
 

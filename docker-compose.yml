@@ -32,6 +32,8 @@ services:
       JwtSettings__SecretKey: ${JWT_SECRET}
       JwtSettings__Issuer: "SIG-Defesa-Civil-API"
       JwtSettings__Audience: "SIG-Defesa-Civil-Frontend"
+      # Jornada de campo: 8 h derrubava a sessão no meio da vistoria.
+      JwtSettings__ExpirationHours: "${JWT_EXPIRACAO_HORAS:-24}"
       AdminSeed__Nome: "Administrador"
       AdminSeed__Email: ${ADMIN_EMAIL}
       AdminSeed__Senha: ${ADMIN_PASSWORD}
