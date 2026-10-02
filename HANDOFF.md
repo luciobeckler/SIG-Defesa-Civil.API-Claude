@@ -251,6 +251,34 @@ O deploy do frontend apaga `www/*`: **preservar `www/app/`** (é onde mora o APK
 
 ---
 
+## 💾 Rascunho da vistoria e perdas de preenchimento (02/10/2026)
+
+**Por que o preenchimento sumia.** Três causas, duas comprovadas no código:
+- `ionViewWillEnter()` chamava `carregar()`, que faz `formAtivo.set(null)`: sair da tela (Documentos,
+  botão voltar) e retornar fechava o formulário aberto. **Corrigido**: com formulário aberto, a tela
+  não recarrega.
+- Sessão de 8 h vencia em campo; o 401 levava ao login no meio da vistoria. **Corrigido**: 24 h,
+  ajustável por `JWT_EXPIRACAO_HORAS` no compose. Atenção: `appsettings.Development.json` também
+  fixava 8 h e mascarava a mudança em teste local.
+- O sistema operacional encerra o app/aba em segundo plano por memória (típico após a câmera).
+  Não há `location.reload()` no código e o `configChanges` do Android está completo — esta é
+  inferência de plataforma, não achado de código. É o que o rascunho cobre.
+
+**Rascunho** (`rascunhos_vistoria`, um por ocorrência e vistoriador, `ConteudoJson` em jsonb):
+`RascunhoService` grava a cada campo (debounce 600 ms) sempre no aparelho e, com rede, no servidor;
+`GET/PUT/DELETE /api/v1/ocorrencias/{id}/rascunho-vistoria`. Ao reabrir, restaura o mais recente
+entre local e servidor. Apagado ao registrar a vistoria ou ao descartar.
+
+Cuidados que custaram retrabalho: `reset()`/`patchValue()` disparam `valueChanges` e recriavam
+rascunho vazio (usar `emitEvent: false`); abrir o formulário preenche `horarioInicio` e isso não
+conta como conteúdo (`_temConteudo`); sem token os endpoints caíam no catch genérico e devolviam
+500 em vez de 401.
+
+**Em produção desde 02/10/2026:** backend `df16e23`, frontend `7ea872c` (bundle `main-BGSCMADV.js`),
+APK **1.2** (`versionCode 3`). Backup: `~/backups/antes_rascunho_20261002_1809.dump`.
+
+---
+
 ## ⏳ Pendências
 
 ### 1. ✅ RESOLVIDO — importador da planilha normalizada
