@@ -240,6 +240,12 @@ linha em `arquivos` nem arquivo em disco.
 ⚠️ O relatório `.docx` é **só texto** (placeholders): nenhuma assinatura entra nele, nem a do
 munícipe. Colocar imagem no relatório é mudança separada.
 
+**Em produção desde 02/10/2026:** backend `0d41598`, frontend `e4cc4ca` (bundle `main-ACADEMSP.js`),
+APK **1.1** (`versionCode 2`, mesma chave da 1.0 → instala por cima) em
+`http://179.106.96.58:8081/app/defesa-civil-sabara.apk` (nome estável) e `...-v1.1.apk` (versionado).
+Backup anterior ao deploy: `~/backups/antes_assinatura_20261002_0324.dump`.
+O deploy do frontend apaga `www/*`: **preservar `www/app/`** (é onde mora o APK).
+
 ⚠️ Chegar ao tablet exige **novo APK** (a tela é do frontend). A chave de publicação já existe
 (`android/keystore.properties`, fora do git), então a atualização instala por cima preservando dados.
 
