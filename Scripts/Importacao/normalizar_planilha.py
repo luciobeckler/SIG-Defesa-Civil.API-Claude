@@ -9,14 +9,41 @@ Princípio: quando a decisão exige conhecimento que o dado não carrega — se
 Mantém separado e marca para revisão. Unir duas pessoas por engano é pior do que
 deixar duas linhas para conferir.
 """
-import collections, datetime, re, unicodedata
+import collections, datetime, re, sys, unicodedata
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 ENTRADA = r"C:\Users\lucio\Desktop\TCC\PLANILHAS DE OCORRENCIAS (1).xlsx"
 SAIDA = r"C:\Users\lucio\Desktop\TCC\PLANILHA_NORMALIZADA.xlsx"
+ABAS = ["OCORRENCIAS_2025", "OCORRENCIAS_2026"]
+DEPARA_REVISADO = None
+RELATORIOS_EXTERNOS = None
+ENCERRAR_TODAS = False
 NA = "N/A"
+
+# Parâmetros opcionais. Sem eles vale a carga original (as duas abas).
+#   --entrada=<planilha crua>     --saida=<planilha normalizada>
+#   --abas=OCORRENCIAS_2026       (uma ou mais, separadas por vírgula)
+#   --depara=<planilha normalizada já revisada> — herda dela o de-para de
+#            vistoriadores decidido à mão, em vez de refazê-lo pelas regras daqui.
+#   --relatorios=<planilha com a aba RELATORIOS PRONTOS 2025> — quando a entrada
+#            não a tem (a planilha nova perdeu essa aba).
+#   --encerrar   aba histórica, já finalizada: toda ocorrência entra ENCERRADA.
+for _arg in sys.argv[1:]:
+    _nome, _, _valor = _arg.partition("=")
+    if _nome == "--entrada":
+        ENTRADA = _valor
+    elif _nome == "--saida":
+        SAIDA = _valor
+    elif _nome == "--abas":
+        ABAS = [a.strip() for a in _valor.split(",") if a.strip()]
+    elif _nome == "--depara":
+        DEPARA_REVISADO = _valor
+    elif _nome == "--relatorios":
+        RELATORIOS_EXTERNOS = _valor
+    elif _nome == "--encerrar":
+        ENCERRAR_TODAS = True
 
 # ════════════════════════════════════════════════════════════════════════════
 #  Utilidades
@@ -123,8 +150,10 @@ MAPA_TIPIFICACAO = {
     # não existem — precisam entrar no catálogo
     "AVALIACAO DE RISCO": ("AVALIACAO_DE_RISCO", True),
     "AVALIACOA DE RISCO": ("AVALIACAO_DE_RISCO", True),
-    "FISSURAS": ("FISSURAS", True),
-    "RACHADURAS": ("RACHADURAS", True),
+    # fissura, trinca e rachadura: um código só, como no formulário atual da
+    # equipe ("TRINCA, FISSURA OU RACHADURA") — mantém o BI comparável entre anos
+    "FISSURAS": ("TRINCAS", False),
+    "RACHADURAS": ("TRINCAS", False),
     "INFILTRACAO": ("INFILTRACAO", True),
     "MURO DE ARRIMO/DIVISA COM ANOMALIAS": ("MURO_DE_ARRIMO_COM_ANOMALIAS", True),
     "COLAPSO DE MURO DE ARRIMO/DIVISA": ("COLAPSO_DE_MURO_DE_ARRIMO", True),
@@ -167,7 +196,49 @@ MAPA_TIPIFICACAO = {
     "ALUGUEL SOCIAL": ("ALUGUEL_SOCIAL", True),
     "AVALIACAO PARA ALUGUEL SOCIAL": ("ALUGUEL_SOCIAL", True),
     "APROVACAO/REPROVACAO DE OBRA PROVISORIA": ("VISTORIA_DE_OBRA", True),
+    "AVALIACAO DE RTISCO": ("AVALIACAO_DE_RISCO", True),
+
+    # vocabulário da coluna SUBTIPO DA OCORRÊNCIA (planilhas a partir de 2026)
+    "TRINCA, FISSURA OU RACHADURA": ("TRINCAS", False),
+    "RISCO EM ARVORE": ("ARVORE_COM_RISCO_DE_QUEDA", False),
+    "QUEDA DE BLOCOS_ROCHAS": ("ROLAMENTO_TOMBAMENTO_DE_BLOCOS", False),
+    "TRANSBORDAMENTO DE CORREGO": ("INUNDACAO_DE_CORREGO_RIO", False),
+    "DRENAGEM DEFICIENTE": ("REDE_PUBLICA_DE_DRENAGEM_PLUVIAL_ROMPIDA", False),
+    "MURO COM RISCO DE COLAPSO": ("MURO_DE_ARRIMO_COM_ANOMALIAS", True),
+    "QUEDA DE MURO": ("COLAPSO_DE_MURO_DE_ARRIMO", True),
+    "RISCO ESTRUTURAL": ("RISCO_ESTRUTURAL", True),
+    "INSTABILIDADE DE TALUDE": ("INSTABILIDADE_DE_TALUDE", True),
+    "INSTABILIDADE DE BARRANCO": ("INSTABILIDADE_DE_TALUDE", True),
+    "VAZAMENTO DE AGUA": ("VAZAMENTO_DE_AGUA", True),
+    "VAZAMENTO DE ESGOTO": ("VAZAMENTO_DE_ESGOTO", True),
+    "RECALQUE DE FUNDACAO": ("RECALQUE_DE_FUNDACAO", True),
+    "RECALQUE DE SOLO": ("RECALQUE_DE_SOLO", True),
+    "ABATIMENTO DE PISO": ("ABATIMENTO_DE_PISO", True),
+    "ENCHENTE": ("ENCHENTE", True),
+    "ENXURRADA": ("ENXURRADA", True),
+    "ASSOREAMENTO": ("ASSOREAMENTO", True),
+    "QUEIMADA": ("QUEIMADA", True),
+    "VEGETACAO DENSA": ("VEGETACAO_DENSA", True),
+    "ANIMAIS PECONHENTOS E VETORES DE DOENCAS": ("ANIMAIS_PECONHENTOS_E_VETORES", True),
+    "PROLIFERACAO DE CARAMUJOS": ("PROLIFERACAO_DE_CARAMUJOS", True),
 }
+
+# Decisão do usuário (31/07/2026): estes códigos não entram como tipificação.
+# A linha continua sendo importada; se nada mais sobrar, a tipificação fica N/A.
+DESCARTAR_TIPIFICACAO = {
+    "ALUGUEL_SOCIAL", "AVALIACAO_DE_RISCO", "CADASTRO_HABITACIONAL", "DENUNCIA",
+    "INVASAO", "RESPOSTA_DE_EMERGENCIA", "VISTORIA_CAUTELAR", "VISTORIA_DE_OBRA",
+}
+
+# CLASSIFICAÇÃO DE RISCO (planilhas a partir de 2026) → Tipo de risco da vistoria.
+# CLIMATOLOGICO não é opção fixa do sistema: entra como opção de catálogo.
+MAPA_TIPO_RISCO = {
+    "BIOLOGICO": "BIOLOGICO", "CONSTRUTIVO": "CONSTRUTIVO",
+    "GEOLOGICO": "GEOLOGICO", "HIDROLOGICO": "HIDROLOGICO",
+    "TECNOLOGICO": "TECNOLOGICO",
+    "CLIMATOLOGICO": "CLIMATOLOGICO", "CLIMATOLOGICOS": "CLIMATOLOGICO",
+}
+TIPO_RISCO_SEM_INFO = {"NAO IDENTIFICADO", "NAO INFORMADO", "NAO ESPECIFICADO", "-"}
 
 MAPA_GRAU = {
     "ALTO": "ALTO", "MEDIO": "MEDIO", "BAIXO": "BAIXO",
@@ -184,6 +255,9 @@ MAPA_INTERDICAO = {
     "NAO": "NAO_NECESSARIA", "NAO ": "NAO_NECESSARIA", "N": "NAO_NECESSARIA",
     "SIM": "TOTAL", "PARCIAL": "PARCIAL", "SIM / PARCIAL": "PARCIAL",
     "DESOCUPACAO": "DESOCUPACAO", "SINALIZACAO": "SINALIZACAO",
+    # vocabulário da planilha de 2026
+    "NAO INTERDITADO": "NAO_NECESSARIA", "INTERDITADO": "TOTAL",
+    "INTERDICAO TOTAL": "TOTAL", "INTERDICAO PARCIAL": "PARCIAL",
 }
 
 MAPA_STATUS_VISTORIA = {"REALIZADA": "REALIZADA", "PENDENTE": "PENDENTE",
@@ -193,7 +267,8 @@ MAPA_STATUS_RELATORIO = {"CONCLUIDO": "CONCLUIDO", "PENDENTE": "PENDENTE",
 
 # Nomes que não são vistoriadores da Defesa Civil de Sabará
 NAO_VISTORIADOR = {"DEMAIS SECRETARIAS", "NOVA LIMA", "SECRETARIA DE OBRAS",
-                   "DEFESA CIVIL", "SEC. OBRAS", "OBRAS"}
+                   "DEFESA CIVIL", "SEC. OBRAS", "OBRAS",
+                   "NAO ESPECIFICADO", "NAO INFORMADO", "SARGENTO"}
 
 # Apelidos e erros de digitação com correspondência inequívoca
 CORRECAO_VISTORIADOR = {
@@ -202,6 +277,9 @@ CORRECAO_VISTORIADOR = {
     "DOUGLAS M": "DOUGLAS MARTINS", "PEDRO P": "PEDRO PAULO",
     "LEANDRO S": "LEANDRO SANTOS", "PAULO R": "PAULO ROGERIO",
     "RAFAEL A": "RAFAEL ALMEIDA", "LEANDRO JESUS": "LEANDRO DE JESUS",
+    "JOANTAS": "JONATAS", "JONATA": "JONATAS", "PRSICILLA": "PRISCILLA",
+    "TASMIN": "YASMIN", "FERNADA": "FERNANDA", "LANDRO": "LEANDRO",
+    "LUDIMILA": "LUDMILA",
 }
 
 # Primeiros nomes que aparecem sozinhos e também compostos: não dá para saber a
@@ -216,8 +294,8 @@ AMBIGUOS = {"LEANDRO", "PAULO", "PEDRO", "DOUGLAS", "RAFAEL", "ROGERIO", "MARCOS
 wb = openpyxl.load_workbook(ENTRADA, data_only=True)
 
 
-def ler(aba, chave_obrigatoria):
-    ws = wb[aba]
+def ler(aba, chave_obrigatoria, origem=None):
+    ws = (origem or wb)[aba]
     cab = [c.value for c in ws[1]]
     out = []
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -228,13 +306,18 @@ def ler(aba, chave_obrigatoria):
     return out
 
 
-linhas = [("2025", l) for l in ler("OCORRENCIAS_2025", "N_DA_VISTORIA")] + \
-         [("2026", l) for l in ler("OCORRENCIAS_2026", "N_DA_VISTORIA")]
+# O ano do protocolo vem do nome da aba (OCORRENCIAS_2026 → 2026).
+linhas = [(aba.rsplit("_", 1)[-1], l) for aba in ABAS for l in ler(aba, "N_DA_VISTORIA")]
 
 # Aba de relatórios: enriquece com moradores, ocupação, orientações, encaminhamentos
+# A aba de relatórios só existe na planilha original — a nova a perdeu. Com
+# --relatorios, ela é lida de outro arquivo.
 relatorios = {}
-for r in ler("RELATORIOS PRONTOS 2025", "N° OCORRENCIA"):
-    relatorios[texto(r.get("N° OCORRENCIA"))] = r
+_wb_rel = (openpyxl.load_workbook(RELATORIOS_EXTERNOS, data_only=True)
+           if RELATORIOS_EXTERNOS else wb)
+if "RELATORIOS PRONTOS 2025" in _wb_rel.sheetnames:
+    for r in ler("RELATORIOS PRONTOS 2025", "N° OCORRENCIA", _wb_rel):
+        relatorios[texto(r.get("N° OCORRENCIA"))] = r
 
 registro = collections.defaultdict(list)   # trilha das decisões, para as abas de revisão
 
@@ -267,6 +350,15 @@ def norm_bairro(bruto):
     return canonico, obs
 
 
+def limpar_nome_vistoriador(parte):
+    """Chave do nome sem patente nem cidade, antes de corrigir apelidos."""
+    p = chave(parte)
+    p = re.sub(r"^(SGT|CB|SD)\.?\s+", "", p)          # patente
+    p = re.sub(r"\s*\((BH|CONTAGEM|NOVA LIMA)\)\s*", "", p)
+    p = re.sub(r"\s+(BH|CONTAGEM)$", "", p)
+    return p.strip(" .-")
+
+
 def norm_vistoriadores(bruto):
     """Decisões do usuário: só os 4 primeiros entram; nomes que não são
     vistoriadores saem. Nada disso marca a linha para revisão — fica registrado
@@ -276,11 +368,7 @@ def norm_vistoriadores(bruto):
         return [], ""
     nomes, ajustes = [], []
     for parte in re.split(r"[,/;]|\bE\b|\+|&", v):
-        p = chave(parte)
-        p = re.sub(r"^(SGT|CB|SD)\.?\s+", "", p)          # patente
-        p = re.sub(r"\s*\((BH|CONTAGEM|NOVA LIMA)\)\s*", "", p)
-        p = re.sub(r"\s+(BH|CONTAGEM)$", "", p)
-        p = p.strip(" .-")
+        p = limpar_nome_vistoriador(parte)
         if not p or p in NAO_VISTORIADOR:
             # Decisão do usuário: quem não é vistoriador sai sem alarde.
             if p:
@@ -291,27 +379,45 @@ def norm_vistoriadores(bruto):
         # se resolve UMA vez na aba de-para, não em cada uma das 776 linhas onde
         # o nome aparece. Por isso ela não marca a linha para revisão.
         canonico = titulo(p)
+        if canonico in VIST_DESCARTAR:
+            ajustes.append(f"nome descartado na revisão do de-para: {canonico}")
+            continue
+        revisado = REVISADO.get(canonico)
+        if revisado:
+            canonico = revisado
         if canonico not in nomes:
             nomes.append(canonico)
-        registro["vistoriadores"].append((
-            texto(parte), canonico,
-            "primeiro nome isolado — confirmar de qual pessoa se trata"
-            if p in AMBIGUOS else ""))
+        if revisado:
+            obs = ""
+        elif DEPARA_REVISADO:
+            obs = "nome novo, fora do de-para revisado — confirmar"
+        elif p in AMBIGUOS:
+            obs = "primeiro nome isolado — confirmar de qual pessoa se trata"
+        else:
+            obs = ""
+        registro["vistoriadores"].append((texto(parte), canonico, obs))
     if len(nomes) > 4:
         ajustes.append(f"vistoriadores além do 4º descartados: {', '.join(nomes[4:])}")
         nomes = nomes[:4]
     return nomes, "; ".join(ajustes)
 
 
+def partes_lista(v):
+    """Separa por vírgula ou ponto e vírgula, respeitando termos entre aspas:
+    "TRINCA, FISSURA OU RACHADURA" é uma opção só, não três."""
+    return [a or b for a, b in re.findall(r'["“”]([^"“”]*)["“”]|([^,;"“”]+)', v)]
+
+
 def norm_tipificacoes(bruto):
-    """Uma célula pode trazer várias tipificações separadas por vírgula."""
+    """Uma célula pode trazer várias tipificações separadas por vírgula.
+    Devolve (códigos, códigos novos no catálogo, observação, descartados)."""
     v = texto(bruto)
     if not v:
-        return [], [], ""
-    codigos, novos, obs = [], [], []
-    for parte in re.split(r"[,;]", v):
+        return [], [], "", []
+    codigos, novos, obs, descartados = [], [], [], []
+    for parte in partes_lista(v):
         k = chave(parte).strip(" .-")
-        if not k or k in ("NAO ESPECIFICADO", "NAO INFORMADO", "-"):
+        if not k or k in ("NAO ESPECIFICADO", "NAO INFORMADO", "NAO IDENTIFICADO", "-"):
             continue
         achou = MAPA_TIPIFICACAO.get(k)
         if not achou:   # tenta casar por prefixo, cobrindo variações longas
@@ -321,6 +427,11 @@ def norm_tipificacoes(bruto):
                     break
         if achou:
             cod, eh_novo = achou
+            if cod in DESCARTAR_TIPIFICACAO:
+                if cod not in descartados:
+                    descartados.append(cod)
+                registro["tipificacoes"].append((texto(parte), cod, "DESCARTADA"))
+                continue
             if cod not in codigos:
                 codigos.append(cod)
                 if eh_novo:
@@ -329,7 +440,7 @@ def norm_tipificacoes(bruto):
         else:
             obs.append(f"tipificação não mapeada: {texto(parte)}")
             registro["tipificacoes"].append((texto(parte), "", "NÃO MAPEADA"))
-    return codigos, novos, "; ".join(obs)
+    return codigos, novos, "; ".join(obs), descartados
 
 
 def norm_grau(bruto):
@@ -337,6 +448,82 @@ def norm_grau(bruto):
     if not k or k in GRAU_SEM_INFO:
         return NA
     return MAPA_GRAU.get(k, NA)
+
+
+def norm_tipo_risco(bruto):
+    """Código do tipo de risco; N/A sem informação; None quando não há mapa."""
+    k = chave(texto(bruto))   # célula vazia: chave(None) daria "NONE"
+    if not k or k in TIPO_RISCO_SEM_INFO:
+        return NA
+    return MAPA_TIPO_RISCO.get(k)
+
+
+def norm_moradores(bruto):
+    """'4 ADULTOS, 2 CRIANÇAS' → total 6 e a conta por grupo. Um número solto é
+    só o total. Texto sem número (ESCOLA, COMÉRCIO) não vira morador.
+    (Antes juntava os dígitos: '4 ADULTOS, 2 CRIANÇAS' virava 42.)"""
+    grupos = {"ADULTO": 0, "CRIANCA": 0, "IDOSO": 0, "DEFICIENTE": 0}
+    k = chave(texto(bruto))
+    if not k or k in ("NAO ESPECIFICADO", "NAO INFORMADO", "-"):
+        return NA, grupos
+    total = 0
+    for n, grupo in re.findall(r"(\d+)\s*(ADULTO|CRIANCA|IDOSO|DEFICIENTE|PCD)?", k):
+        total += int(n)
+        if grupo:
+            grupos["DEFICIENTE" if grupo == "PCD" else grupo] += int(n)
+    return (str(total) if total else NA), grupos
+
+
+def norm_forma_recebimento(bruto):
+    """O sistema só conhece EMAIL e PRESENCIAL. Entrega em mãos é presencial;
+    envio remoto (e-mail, WhatsApp, processo) conta como EMAIL."""
+    k = chave(texto(bruto))
+    if not k:
+        return NA
+    if any(t in k for t in ("FISICO", "RETIR", "PRESENC", "MAOS")):
+        return "PRESENCIAL"
+    return "EMAIL"
+
+
+def norm_regime(bruto):
+    """Ocupação irregular é opção fixa do sistema; o resto (área particular,
+    área pública…) entra como opção de catálogo, com o texto da planilha."""
+    k = chave(texto(bruto))
+    if not k or k in ("NAO ESPECIFICADO", "NAO INFORMADO", "-"):
+        return NA
+    if "IRREGULAR" in k:
+        return "IRREGULAR"
+    # grafia padronizada (a planilha tem "AREA", "ÁREA" e até "ÃREA")
+    return {"AREA PARTICULAR": "Área particular", "AREA PUBLICA": "Área pública",
+            "AREA DE APP": "Área de APP"}.get(k, titulo(bruto))
+
+
+# Siglas das secretarias de Sabará → enum Encaminhamento do sistema.
+MAPA_ENCAMINHAMENTO = {
+    "SMDS": "SEC_DESENV_SOCIAL", "SMDAS": "SEC_DESENV_SOCIAL",
+    "DESENVOLVIMENTO SOCIAL": "SEC_DESENV_SOCIAL",
+    "SMOP": "SEC_OBRAS", "SMO": "SEC_OBRAS", "OBRAS": "SEC_OBRAS",
+    "SECRETARIA DE OBRAS": "SEC_OBRAS",
+    "SMMA": "SEC_MEIO_AMBIENTE", "MEIO AMBIENTE": "SEC_MEIO_AMBIENTE",
+    "COPASA": "COPASA", "CEMIG": "CEMIG", "DNIT": "DNIT",
+    "AJUDA HUMANITARIA": "AJUDA_HUMANITARIA",
+}
+
+
+def norm_encaminhamentos(bruto):
+    """Devolve (códigos do enum, se houve destino sem código). Destinos sem
+    correspondência (PGM, regionais) entram como OUTROS."""
+    codigos, outros = [], False
+    for parte in partes_lista(texto(bruto)):
+        k = chave(parte).strip(" .-")
+        if not k or k in ("NAO ESPECIFICADO", "NAO INFORMADO"):
+            continue
+        cod = MAPA_ENCAMINHAMENTO.get(k)
+        if not cod:
+            cod, outros = "OUTROS", True
+        if cod not in codigos:
+            codigos.append(cod)
+    return codigos, outros
 
 
 def norm_interdicao(bruto):
@@ -359,6 +546,32 @@ def norm_sim_nao(bruto):
 #  Montagem
 # ════════════════════════════════════════════════════════════════════════════
 
+# De-para de vistoriadores revisado à mão (--depara). A coluna NOME NORMALIZADO
+# daquela planilha é a autoridade — é onde se decidiu, por exemplo, a qual
+# pessoa um primeiro nome isolado se refere. Nomes que ela não conhece seguem
+# as regras daqui e são marcados na aba DE-PARA VISTORIADORES.
+REVISADO, VIST_DESCARTAR = {}, set()
+if DEPARA_REVISADO:
+    _destinos = collections.defaultdict(set)
+    _rev = openpyxl.load_workbook(DEPARA_REVISADO, read_only=True, data_only=True)
+    for _row in _rev["DE-PARA VISTORIADORES"].iter_rows(min_row=2, values_only=True):
+        _bruto, _novo = (list(_row) + [None, None])[:2]
+        _p = limpar_nome_vistoriador(_bruto or "")
+        if not _p or _p in NAO_VISTORIADOR:
+            continue
+        _canon = titulo(CORRECAO_VISTORIADOR.get(_p, _p))
+        if chave(_novo or "") in NAO_VISTORIADOR:
+            VIST_DESCARTAR.add(_canon)
+        elif texto(_novo):
+            if texto(_novo) == titulo(_p) and _canon != titulo(_p):
+                continue   # linha sem decisão (ficou o padrão); vale a correção de digitação
+            _destinos[_canon].add(texto(_novo))
+    _conflitos = {c: d for c, d in _destinos.items() if len(d) > 1}
+    if _conflitos:
+        sys.exit("De-para revisado ambíguo (mesmo nome, pessoas diferentes): "
+                 + "; ".join(f"{c} -> {sorted(d)}" for c, d in _conflitos.items()))
+    REVISADO = {c: next(iter(d)) for c, d in _destinos.items()}
+
 COLUNAS = [
     ("PROTOCOLO", "Etapa 1"), ("N_ORIGINAL_PLANILHA", "Etapa 1"),
     ("DATA_ABERTURA", "Etapa 1"), ("HORA_ABERTURA", "Etapa 1"),
@@ -373,9 +586,12 @@ COLUNAS = [
     ("VISTORIADOR_1", "Etapa 3"), ("VISTORIADOR_2", "Etapa 3"),
     ("VISTORIADOR_3", "Etapa 3"), ("VISTORIADOR_4", "Etapa 3"),
     ("DATA_VISTORIA", "Etapa 4"), ("STATUS_VISTORIA", "Etapa 4"),
-    ("TIPIFICACAO_VISTORIA", "Etapa 4"), ("GRAU_RISCO_ENCONTRADO", "Etapa 4"),
+    ("TIPIFICACAO_VISTORIA", "Etapa 4"), ("TIPO_RISCO", "Etapa 4"),
+    ("GRAU_RISCO_ENCONTRADO", "Etapa 4"),
     ("INTERDICAO", "Etapa 4"), ("REMOCAO", "Etapa 4"),
-    ("TOTAL_MORADORES", "Etapa 4"), ("REGIME_OCUPACAO", "Etapa 4"),
+    ("TOTAL_MORADORES", "Etapa 4"), ("NUM_ADULTOS", "Etapa 4"),
+    ("NUM_CRIANCAS", "Etapa 4"), ("NUM_IDOSOS", "Etapa 4"),
+    ("NUM_DEFICIENTES", "Etapa 4"), ("REGIME_OCUPACAO", "Etapa 4"),
     ("ORIENTACOES", "Etapa 4"), ("OBSERVACOES_VISTORIA", "Etapa 4"),
     ("NOTIFICADO", "Etapa 5"), ("FORMA_RECEBIMENTO", "Etapa 5"),
     ("STATUS_RELATORIO", "Relatório"), ("DATA_RELATORIO", "Relatório"),
@@ -395,6 +611,14 @@ for ano, l in linhas:
     obs_rev, ajustes = [], []
 
     data_sol = como_data(l.get("DATA_SOLICITACAO"))
+    # Virada de ano: a aba de 2026 traz pedidos de janeiro/fevereiro datados de
+    # 2025, intercalados com protocolos de 2026 — erro de digitação do ano. Sem
+    # a correção, a vistoria parece feita um ano depois e é descartada abaixo.
+    if data_sol and ano.isdigit() and data_sol.year == int(ano) - 1 and data_sol.month <= 2:
+        corrigida = data_sol.replace(year=int(ano))
+        ajustes.append(f"ano da data de solicitação corrigido: "
+                       f"{data_sol:%d/%m/%Y} → {corrigida:%d/%m/%Y}")
+        data_sol = corrigida
     if not data_sol:
         # Sem data de solicitação a linha não é uma ocorrência: na planilha são
         # números pré-impressos, com todo o resto em branco. Ficam de fora.
@@ -417,11 +641,25 @@ for ano, l in linhas:
     if aj_v:
         ajustes.append(aj_v)
 
-    tips, novos, obs_t = norm_tipificacoes(l.get("TIPIFICACAO_OCORRENCIA"))
-    if obs_t:
-        obs_rev.append(obs_t)   # tipificação sem correspondência ainda pede olhar
-    for n in novos:
+    # Duas fontes: a coluna antiga e o SUBTIPO das planilhas mais novas, onde a
+    # antiga passou a trazer quase sempre "avaliação de risco" (descartada).
+    tips, novos, obs_t, desc_t = norm_tipificacoes(l.get("TIPIFICACAO_OCORRENCIA"))
+    tips_s, novos_s, obs_s, desc_s = norm_tipificacoes(l.get("SUBTIPO DA OCORRÊNCIA"))
+    tips = list(dict.fromkeys(tips + tips_s))
+    tips_descartadas = list(dict.fromkeys(desc_t + desc_s))
+    for obs in (obs_t, obs_s):
+        if obs:
+            obs_rev.append(obs)   # tipificação sem correspondência ainda pede olhar
+    if tips_descartadas:
+        ajustes.append("tipificação descartada: " + ", ".join(tips_descartadas))
+    for n in dict.fromkeys(novos + novos_s):
         novos_catalogo[n] += 1
+
+    tipo_risco = norm_tipo_risco(l.get("CLASSIFICAÇÃO DE RISCO"))
+    if tipo_risco is None:
+        obs_rev.append("classificação de risco não mapeada: "
+                       + texto(l.get("CLASSIFICAÇÃO DE RISCO")))
+        tipo_risco = NA
 
     data_vist = como_data(l.get("DATA DA VISTORIA"))
     if data_vist and not (0 <= (data_vist - data_sol).days <= 365):
@@ -429,7 +667,7 @@ for ano, l in linhas:
         data_vist = None
 
     rel = relatorios.get(num, {})
-    moradores = so_digitos(rel.get("N° DE MORADORES"))
+    moradores, grupos = norm_moradores(rel.get("N° DE MORADORES"))
 
     cpf = so_digitos(l.get("CPF/IDENTIDADE"))
     if cpf and len(cpf) != 11:
@@ -446,13 +684,33 @@ for ano, l in linhas:
         status_oc = "ENCERRADA"
     else:
         status_oc = "VISTORIA_SOLICITADA"
+    if ENCERRAR_TODAS and status_oc != "ENCERRADA":
+        ajustes.append(f"status {status_oc} → ENCERRADA (aba histórica, já finalizada)")
+        status_oc = "ENCERRADA"
 
     obs_texto = " | ".join(filter(None, [
         texto(l.get("OBSERVAÇÃO")),
-        f"Despachos: {texto(l.get('DESPACHOS ENVIADOS'))}" if texto(l.get("DESPACHOS ENVIADOS")) else "",
-        f"Resposta: {texto(l.get('RESPOSTA DESPACHOS'))}" if texto(l.get("RESPOSTA DESPACHOS")) else "",
         f"Conclusão do relatório: {texto(rel.get('CONCLUSÃO'))}" if texto(rel.get("CONCLUSÃO")) else "",
     ]))
+
+    # Despachos, respostas e destinos vão para a etapa 6 (Encaminhamento final),
+    # que aparece na tela mesmo quando não há vistoria registrada.
+    enc_codigos, enc_outros = norm_encaminhamentos(rel.get("ENCAMINHAMENTOS"))
+    retorno = " | ".join(filter(None, [
+        f"Encaminhado a: {texto(rel.get('ENCAMINHAMENTOS'))}" if enc_outros else "",
+        f"Despachos: {texto(l.get('DESPACHOS ENVIADOS'))}" if texto(l.get("DESPACHOS ENVIADOS")) else "",
+        f"Resposta: {texto(l.get('RESPOSTA DESPACHOS'))}" if texto(l.get("RESPOSTA DESPACHOS")) else "",
+    ]))
+
+    # Sem descrição, o SUBTIPO preserva o que a equipe registrou — inclusive
+    # nas linhas sem vistoria, onde a tipificação não teria onde ficar.
+    descricao = (texto(l.get("DESCRIÇÃO PRELIMINAR"))
+                 or texto(l.get("SUBTIPO DA OCORRÊNCIA")).replace('"', "")
+                 or texto(l.get("TIPIFICACAO_OCORRENCIA")) or NA)
+    # A vistoria só é criada com data e vistoriador; sem ela, a observação iria
+    # para lugar nenhum — vai para a descrição, que sempre é exibida.
+    if obs_texto and (not data_vist or not vist):
+        descricao = (descricao + " | " if descricao != NA else "") + f"Observação: {obs_texto}"
 
     linha = {
         "PROTOCOLO": protocolo,
@@ -468,10 +726,10 @@ for ano, l in linhas:
         "BAIRRO": bairro,
         "CIDADE": "Sabará",
         "UF": "MG",
-        "DESCRICAO_PROBLEMA": texto(l.get("DESCRIÇÃO PRELIMINAR")) or texto(l.get("TIPIFICACAO_OCORRENCIA")) or NA,
+        "DESCRICAO_PROBLEMA": descricao,
         "TIPIFICACAO_INICIAL": "; ".join(tips) if tips else NA,
         "GRAU_RISCO_INICIAL": NA,
-        "EMERGENCIA": "SIM" if any("EMERGENCIA" in t for t in tips) else "NAO",
+        "EMERGENCIA": "SIM" if any("EMERGENCIA" in t for t in tips + tips_descartadas) else "NAO",
         "DATA_AGENDAMENTO": (como_data(l.get("ABERTURA DA VISTORIA")) or data_vist or "") and
                             (como_data(l.get("ABERTURA DA VISTORIA")) or data_vist).strftime("%d/%m/%Y") or NA,
         "VISTORIADOR_1": vist[0] if len(vist) > 0 else NA,
@@ -481,20 +739,24 @@ for ano, l in linhas:
         "DATA_VISTORIA": data_vist.strftime("%d/%m/%Y") if data_vist else NA,
         "STATUS_VISTORIA": status_v,
         "TIPIFICACAO_VISTORIA": "; ".join(tips) if tips else NA,
+        "TIPO_RISCO": tipo_risco,
         "GRAU_RISCO_ENCONTRADO": norm_grau(l.get("GRAU_RISCO")),
         "INTERDICAO": norm_interdicao(l.get("INTERDIÇÃO")),
         "REMOCAO": NA,
-        "TOTAL_MORADORES": moradores or NA,
-        "REGIME_OCUPACAO": titulo(rel.get("OCUPAÇÃO DO IMOVEL")) or NA,
+        "TOTAL_MORADORES": moradores,
+        "NUM_ADULTOS": grupos["ADULTO"] or NA,
+        "NUM_CRIANCAS": grupos["CRIANCA"] or NA,
+        "NUM_IDOSOS": grupos["IDOSO"] or NA,
+        "NUM_DEFICIENTES": grupos["DEFICIENTE"] or NA,
+        "REGIME_OCUPACAO": norm_regime(rel.get("OCUPAÇÃO DO IMOVEL")),
         "ORIENTACOES": texto(rel.get("ORIENTAÇÕES")) or NA,
         "OBSERVACOES_VISTORIA": obs_texto or NA,
         "NOTIFICADO": norm_sim_nao(l.get("NOTIFICAÇÃO")),
-        "FORMA_RECEBIMENTO": (lambda f: "EMAIL" if "MAIL" in chave(f) else
-                              ("PRESENCIAL" if f else NA))(texto(rel.get("FORMA DE ENTREGA DO RELATORIO"))),
+        "FORMA_RECEBIMENTO": norm_forma_recebimento(rel.get("FORMA DE ENTREGA DO RELATORIO")),
         "STATUS_RELATORIO": status_r,
         "DATA_RELATORIO": (lambda d: d.strftime("%d/%m/%Y") if d else NA)(como_data(l.get("DATA_RELATORIO"))),
-        "ENCAMINHAMENTOS": texto(rel.get("ENCAMINHAMENTOS")) or NA,
-        "RETORNO_ENCAMINHAMENTOS": texto(l.get("RESPOSTA DESPACHOS")) or NA,
+        "ENCAMINHAMENTOS": "; ".join(enc_codigos) if enc_codigos else NA,
+        "RETORNO_ENCAMINHAMENTOS": retorno or NA,
         "STATUS_OCORRENCIA": status_oc,
         # Registro do que foi resolvido automaticamente, conforme as decisões
         # tomadas. Não pede ação — existe para permitir auditoria.

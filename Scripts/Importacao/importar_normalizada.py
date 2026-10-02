@@ -27,6 +27,50 @@ OUT = Path(__file__).parent / "out"
 NA = "N/A"
 
 EMAIL_IMPORTADOR = "importacao@sig.defesacivil.local"
+
+# Rótulo exibido nas listas de seleção para os códigos que a carga cria no
+# catálogo. Sem entrada aqui, o rótulo é o próprio código.
+ROTULOS = {
+    "ABATIMENTO_DE_PISO": "Abatimento de piso",
+    "ACIDENTE_COM_VEICULO": "Acidente com veículo",
+    "ANIMAIS_PECONHENTOS_E_VETORES": "Animais peçonhentos e vetores de doenças",
+    "ASSOREAMENTO": "Assoreamento",
+    "COLAPSO_DE_MURO_DE_ARRIMO": "Colapso de muro de arrimo/divisa",
+    "COLAPSO_ESTRUTURAL": "Colapso estrutural",
+    "DESABAMENTO_PARCIAL": "Desabamento parcial",
+    "DESLOCAMENTO_DE_ESTRUTURA": "Deslocamento de estrutura",
+    "DESPRENDIMENTO_DE_REBOCO": "Desprendimento de reboco",
+    "DESTELHAMENTO": "Destelhamento",
+    "ENCHENTE": "Enchente",
+    "ENXURRADA": "Enxurrada",
+    "EXPLOSAO": "Explosão",
+    "FISSURAS": "Fissuras",
+    "INFILTRACAO": "Infiltração",
+    "INSTABILIDADE_DE_TALUDE": "Instabilidade de talude/barranco",
+    "LANCAMENTO_IRREGULAR_DE_AGUA": "Lançamento irregular de água pluvial/esgoto",
+    "MURO_DE_ARRIMO_COM_ANOMALIAS": "Muro de arrimo/divisa com anomalias",
+    "PROLIFERACAO_DE_CARAMUJOS": "Proliferação de caramujos",
+    "QUEIMADA": "Queimada",
+    "RACHADURAS": "Rachaduras",
+    "RECALQUE_DE_FUNDACAO": "Recalque de fundação",
+    "RECALQUE_DE_SOLO": "Recalque de solo",
+    "REMOCAO_DE_TERRA": "Remoção de terra",
+    "RISCO_ESTRUTURAL": "Risco estrutural",
+    "VAZAMENTO_DE_AGUA": "Vazamento de água",
+    "VAZAMENTO_DE_ESGOTO": "Vazamento de esgoto",
+    "VEGETACAO_DENSA": "Vegetação densa",
+    "CLIMATOLOGICO": "Climatológico",
+    "NAO_CONSTATADO": "Não constatado",
+}
+
+# Ordem do enum Encaminhamento (Enums/Enums.cs): a coluna guarda o índice (int[]).
+ENCAMINHAMENTO_ENUM = ["AJUDA_HUMANITARIA", "CEMIG", "COPASA", "DNIT", "OUTROS",
+                       "PROVIDENCIAS_PELO_MORADOR", "SEC_DESENV_SOCIAL",
+                       "SEC_MEIO_AMBIENTE", "SEC_OBRAS"]
+
+# Opções fixas do Tipo de risco no frontend (enum-options.ts): não vão ao catálogo.
+TIPOS_RISCO_FIXOS = {"BIOLOGICO", "CONSTRUTIVO", "GEOLOGICO", "HIDROLOGICO",
+                     "TECNOLOGICO", "OUTROS"}
 DOMINIO_VISTORIADOR = "vistoriador.importado"
 
 
@@ -143,6 +187,9 @@ def main():
     W("-- Importação a partir da PLANILHA NORMALIZADA — importar_normalizada.py")
     W(f"-- Gerado em {datetime.datetime.now().isoformat(timespec='seconds')} | Fonte: {xlsx.name}")
     W("-- Idempotente: reexecutar não duplica (NOT EXISTS / ON CONFLICT).")
+    # O arquivo é UTF-8; sem isto, o psql do Windows pode lê-lo como WIN1252
+    # e falhar (ou gravar acentos corrompidos) conforme o terminal.
+    W("SET client_encoding = 'UTF8';")
     W("BEGIN;")
     W("")
 
@@ -155,6 +202,20 @@ def main():
         # log_acesso_lgpd referencia ocorrencias sem cascade
         W('DELETE FROM log_acesso_lgpd WHERE "OcorrenciaId" IS NOT NULL;')
         W("DELETE FROM ocorrencias;")
+        W("")
+        # Contas de vistoriador criadas por importações anteriores. Só podem ser
+        # apagadas DEPOIS das ocorrências: agendamentos e vistorias as referenciam
+        # com ON DELETE RESTRICT. Sem isto, uma recarga com o de-para revisado
+        # deixaria no banco os nomes duplicados que a revisão veio eliminar.
+        W(f"""DELETE FROM usuarios
+ WHERE "Email" LIKE '%@{DOMINIO_VISTORIADOR}'
+   AND NOT EXISTS (SELECT 1 FROM agendamentos_vistoria a
+                    WHERE a."Vistoriador1Id" = usuarios."Id" OR a."Vistoriador2Id" = usuarios."Id"
+                       OR a."Vistoriador3Id" = usuarios."Id" OR a."Vistoriador4Id" = usuarios."Id")
+   AND NOT EXISTS (SELECT 1 FROM vistorias v
+                    WHERE v."Vistoriador1Id" = usuarios."Id" OR v."Vistoriador2Id" = usuarios."Id"
+                       OR v."Vistoriador3Id" = usuarios."Id" OR v."Vistoriador4Id" = usuarios."Id"
+                       OR v."RegistradoPorId" = usuarios."Id");""")
         W("")
 
     # ── 1. Usuário técnico da importação ────────────────────────────────────
@@ -199,9 +260,14 @@ WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE "Email" = '{email}');""")
         for v in sorted(vistos):
             opcoes.append((campo, v))
 
+    tipos_risco = {str(l.get("TIPO_RISCO")).strip() for l in linhas
+                   if not vazio(l.get("TIPO_RISCO"))}
+    for v in sorted(tipos_risco - TIPOS_RISCO_FIXOS):
+        opcoes.append(("TIPO_RISCO", v))
+
     for campo, valor in opcoes:
         W(f"""INSERT INTO opcoes_campo_vistoria ("Campo","Valor","Label","CriadoEm")
-VALUES ('{campo}', {sql_str_nn(valor)}, {sql_str_nn(valor)}, NOW())
+VALUES ('{campo}', {sql_str_nn(valor)}, {sql_str_nn(ROTULOS.get(valor, valor))}, NOW())
 ON CONFLICT ("Campo","Valor") DO NOTHING;""")
     W("")
 
@@ -248,23 +314,28 @@ SELECT {subq_oc}, {sql_str_nn(l.get('ENDERECO'), 'Não informado')},
   {sql_str_nn(l.get('CIDADE'), 'Sabará')}, {sql_str_nn(l.get('UF'), 'MG')}
 WHERE NOT EXISTS (SELECT 1 FROM localizacoes WHERE "OcorrenciaId" = {subq_oc});""")
 
-        # 5b. Avaliação de risco — só quando há tipificação de verdade.
-        #     A tipificação agora é text[]; ver migration TipificacaoInicialMultivalorada.
-        tips = l.get("TIPIFICACAO_INICIAL")
-        if not vazio(tips):
-            W(f"""INSERT INTO avaliacoes_risco ("OcorrenciaId","TipificacaoInicial","GrauRiscoInicial",
-  "AbertaPorUsuarioId","Emergencia","RegistradoEm","AtualizadoEm")
-SELECT {subq_oc}, {sql_array(tips)},
-  {sql_str_nn(l.get('GRAU_RISCO_INICIAL'), 'Não informado')}, {subq_imp},
-  {sql_bool(l.get('EMERGENCIA'))}, {abertura}, {abertura}
-WHERE NOT EXISTS (SELECT 1 FROM avaliacoes_risco WHERE "OcorrenciaId" = {subq_oc});""")
-            contadores["avaliacoes"] += 1
+        # 5b. Avaliação de risco (etapa 2) — NÃO é criada na carga histórica.
+        #
+        # O processo antigo, em papel, não tinha etapa de triagem separada: a
+        # planilha registra um único grau de risco, o constatado em campo, que
+        # já vai para a vistoria. A tipificação também é a mesma nas duas
+        # colunas da planilha normalizada — criar a avaliação só duplicaria.
+        #
+        # Além disso, GrauRiscoInicial é um enum (BAIXO/MEDIO/ALTO/MUITO_ALTO)
+        # sem representação para "não informado". Preencher com texto livre faz
+        # o EF estourar ao ler ("Cannot convert string value ... to any value in
+        # the mapped 'GrauRisco' enum") e derruba a listagem inteira.
+        #
+        # Consequência assumida: `tem_avaliacao_risco` fica falso em todo o
+        # histórico — o que é verdade, e o painel de qualidade já reporta assim.
 
         # 5c. Agendamento + vistoria
         v1 = l.get("VISTORIADOR_1")
         data_vist = l.get("DATA_VISTORIA")
         if not vazio(v1) or not vazio(data_vist):
-            status_ag = "CONCLUIDO" if not vazio(data_vist) else "ATIVO"
+            # Vistoria realizada sem data anotada também conclui o agendamento.
+            realizada = str(l.get("STATUS_VISTORIA", "")).strip() == "REALIZADA"
+            status_ag = "CONCLUIDO" if not vazio(data_vist) or realizada else "ATIVO"
             subs = [subq_vist(l.get(c)) if not vazio(l.get(c)) else "NULL"
                     for c in ("VISTORIADOR_1", "VISTORIADOR_2",
                               "VISTORIADOR_3", "VISTORIADOR_4")]
@@ -291,8 +362,11 @@ WHERE NOT EXISTS (SELECT 1 FROM agendamentos_vistoria WHERE "OcorrenciaId" = {su
   "RegistradoPorId","RegistradoEm","AtualizadoEm")
 SELECT {subq_oc}, 1, {subq_ag}, {sql_data(data_vist)}, INTERVAL '0', INTERVAL '0',
   NULL, 'Não informado', 'Não informado', 0, 0, 0, 0,
-  FALSE, 0, 0, 0, 0, {sql_int(l.get('TOTAL_MORADORES'), '0')},
-  'Não informado', {sql_str_nn(l.get('GRAU_RISCO_ENCONTRADO'), 'Não informado')},
+  FALSE, {sql_int(l.get('NUM_ADULTOS'), '0')}, {sql_int(l.get('NUM_CRIANCAS'), '0')},
+  {sql_int(l.get('NUM_IDOSOS'), '0')}, {sql_int(l.get('NUM_DEFICIENTES'), '0')},
+  {sql_int(l.get('TOTAL_MORADORES'), '0')},
+  {sql_str_nn(l.get('TIPO_RISCO'), 'Não informado')},
+  {sql_str_nn(l.get('GRAU_RISCO_ENCONTRADO'), 'Não informado')},
   {sql_array(l.get('TIPIFICACAO_VISTORIA'))},
   {sql_str_nn(l.get('REGIME_OCUPACAO'), 'Não informado')},
   ARRAY[]::text[], ARRAY[]::text[],
@@ -318,6 +392,21 @@ SELECT {subq_oc}, {sql_str_nn(l.get('SOLICITANTE_NOME'), 'Não informado')},
 WHERE {sql_data(data_notif)} IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM notificados WHERE "OcorrenciaId" = {subq_oc});""")
             contadores["notificados"] += 1
+
+        # 5e. Encaminhamento final (etapa 6): destinos + despachos e respostas
+        enc = [c.strip() for c in str(l.get("ENCAMINHAMENTOS") or "").split(";")
+               if c.strip() and c.strip() != NA]
+        retorno = l.get("RETORNO_ENCAMINHAMENTOS")
+        if enc or not vazio(retorno):
+            indices = ", ".join(str(ENCAMINHAMENTO_ENUM.index(c)) for c in enc)
+            quando = sql_ts(l.get("DATA_RELATORIO"))
+            if quando == "NULL":
+                quando = abertura
+            W(f"""INSERT INTO encaminhamentos_finais ("OcorrenciaId","Encaminhamentos",
+  "RetornoEncaminhamentos","RegistradoPorId","RegistradoEm","AtualizadoEm")
+SELECT {subq_oc}, ARRAY[{indices}]::integer[], {sql_str(retorno)}, {subq_imp}, {quando}, {quando}
+WHERE NOT EXISTS (SELECT 1 FROM encaminhamentos_finais WHERE "OcorrenciaId" = {subq_oc});""")
+            contadores["encaminhamentos"] += 1
 
         W("")
 
