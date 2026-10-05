@@ -356,6 +356,56 @@ Sugerido calcular do cache local — não implementado.
 
 ---
 
+## 🪪 CPF e e-mail opcionais na ocorrência (05/10/2026)
+
+Pedido do usuário: boa parte dos atendimentos chega por telefone ou balcão, sem documento em mãos
+e sem e-mail — exigir os dois travava a abertura.
+
+⚠️ **Tirar o `[Required]` do DTO não basta.** Havia uma **segunda validação manual** em
+`OcorrenciaController.ValidarRequest`, que devolvia 400 `VALIDACAO_FALHOU` mesmo com o DTO liberado.
+Foi um ensaio de ponta a ponta contra a API real que revelou isso: o build passava e a tela liberava
+o botão, mas a API recusava.
+
+- `CidadaoDto`: `Cpf` e `Email` viraram `string?` sem `[Required]`.
+- `ValidarRequest`: a exigência dos dois saiu; o **formato** do CPF (11 dígitos) continua cobrado
+  quando o campo vem preenchido.
+- `RelatorioService`: `<<EMAIL>>` era o único placeholder sem `?? string.Empty` e cai num
+  `Replace(tag, value)` — sem a correção, gerar relatório de ocorrência sem e-mail lançaria
+  `ArgumentNullException`. Já era risco latente nos registros históricos importados.
+- Frontend: `nova.page` usa `validarDigitosOpcional(11)` no CPF e só `Validators.email` no e-mail;
+  `detalhe.page` idem no formulário de edição. Campo vazio vai como **null**, não string vazia,
+  para o banco guardar `NULL` como nos registros históricos.
+- `cidadaoDto.ts` (contrato gerado do OpenAPI) ajustado à mão — não há script de geração no
+  `package.json`.
+
+**Sem migration:** as colunas já eram nulas. Na base de produção, 889 das 1236 ocorrências têm CPF
+e apenas **225 têm e-mail** — a obrigatoriedade já não correspondia aos dados reais.
+
+**Em produção desde 05/10/2026:** backend `d0b18c2`, frontend `4cbf309` (bundle `main-XPLF2BNO.js`),
+APK **1.3** (`versionCode 4`). Backups anteriores ao deploy:
+`~/backups/antes_cpf_email_20261005_1743.dump` e `~/backups/www_antes_cpf_email_20261005_1745.tgz`.
+
+⚠️ **O IP externo parou de aceitar a chave SSH** (`179.106.96.58` → *Permission denied (publickey)*),
+embora a porta 22 responda e o app siga no ar em 8081. O IP **interno** `192.168.8.15` continua
+aceitando a mesma chave — este deploy foi todo por ele. Só funciona de dentro da rede da prefeitura.
+
+### Verificação em produção sem criar registro
+`ValidarRequest` roda **antes** da checagem de arquivos e antes de qualquer gravação. Mandando
+`Dados` + `Comprovante` e **omitindo as Fotos**, a requisição morre em `ARQUIVOS_AUSENTES` sem
+persistir nada — e o erro que volta diz qual código está no ar:
+- sem CPF e sem e-mail → `ARQUIVOS_AUSENTES` ("ao menos uma foto") = passou pela validação ✅
+- CPF com 3 dígitos → `VALIDACAO_FALHOU` ("CPF deve conter 11 dígitos") = formato ainda cobrado ✅
+
+Script em `scratchpad/sondar_producao.py`. Atenção: o binder recusa antes do controller se o
+`Comprovante` não vier (`IFormFile` não-nulo), então a sonda precisa mandá-lo.
+
+### Pendência encontrada de passagem
+O formulário de edição envia o CPF, mas `OcorrenciaService.AtualizarEtapa1Async` **não atualiza
+`Cpf`** (atualiza nome, e-mail, telefone, celular, RG e órgão emissor). Corrigir um CPF digitado
+errado na abertura não funciona hoje. É anterior a esta mudança e não foi mexido.
+
+---
+
 ## 📁 Scripts auxiliares (todos versionados)
 
 ```
