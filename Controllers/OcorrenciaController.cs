@@ -1111,13 +1111,12 @@ namespace SIG_Defesa_Civil.API.Controllers
             if (string.IsNullOrWhiteSpace(request.Cidadao?.Nome))
                 erros.Add("Nome do cidadão é obrigatório");
 
-            if (string.IsNullOrWhiteSpace(request.Cidadao?.Cpf))
-                erros.Add("CPF do cidadão é obrigatório");
-            else if (request.Cidadao.Cpf.Length != 11 || !request.Cidadao.Cpf.All(char.IsDigit))
+            // CPF e e-mail são opcionais: boa parte dos atendimentos chega por
+            // telefone ou balcão, sem o documento em mãos. Quando vêm preenchidos,
+            // o formato ainda é cobrado.
+            if (!string.IsNullOrWhiteSpace(request.Cidadao?.Cpf)
+                && (request.Cidadao.Cpf.Length != 11 || !request.Cidadao.Cpf.All(char.IsDigit)))
                 erros.Add("CPF deve conter 11 dígitos numéricos");
-
-            if (string.IsNullOrWhiteSpace(request.Cidadao?.Email))
-                erros.Add("Email do cidadão é obrigatório");
 
             if (string.IsNullOrWhiteSpace(request.Local?.Endereco))
                 erros.Add("Endereço é obrigatório");

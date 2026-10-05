@@ -6,7 +6,9 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Usuarios
     public class CidadaoDto
     {
         [Required] public string Nome { get; set; } = string.Empty;
-        [Required] public string Cpf { get; set; } = string.Empty;
+
+        /// <summary>Opcional — o solicitante nem sempre tem o documento em mãos.</summary>
+        public string? Cpf { get; set; }
 
         public string? Rg { get; set; }
         /// <summary>Órgão emissor do RG (ex: SSP/MG).</summary>
@@ -15,6 +17,7 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Usuarios
         public string? Telefone { get; set; }
         public string? Celular { get; set; }
 
-        [Required] public string Email { get; set; } = string.Empty;
+        /// <summary>Opcional — boa parte dos solicitantes só deixa telefone.</summary>
+        public string? Email { get; set; }
     }
 }

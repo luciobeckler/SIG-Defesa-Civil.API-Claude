@@ -1,4 +1,4 @@
-using DocumentFormat.OpenXml.Packaging;
+﻿using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -91,7 +91,7 @@ namespace SIG_Defesa_Civil.API.Services.Relatorio
                 ["<<UF>>"]                          = loc?.Uf ?? string.Empty,
                 ["<<TELEFONE>>"]                    = sol.Telefone ?? string.Empty,
                 ["<<CELULAR>>"]                     = sol.Celular ?? string.Empty,
-                ["<<EMAIL>>"]                       = sol.Email,
+                ["<<EMAIL>>"]                       = sol.Email ?? string.Empty,
                 ["<<DATA_VISTORIA>>"]               = vistoria.DataVistoria.ToString("dd/MM/yyyy"),
                 ["<<HORARIO_INICIO_VISTORIA>>"]     = vistoria.HorarioInicio.ToString(@"hh\:mm"),
                 ["<<NOME_VISTORIADOR_1>>"]          = agendamento?.Vistoriador1?.Nome ?? string.Empty,
