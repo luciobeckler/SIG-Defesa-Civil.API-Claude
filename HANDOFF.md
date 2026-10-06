@@ -419,7 +419,14 @@ tela, com os dois caminhos do aviso.
 ⚠️ Lembrete que custou um ciclo: depois de `dotnet ef migrations add`, **rodar `dotnet build`**
 antes de subir a API, senão ela carrega a DLL antiga e loga "No migrations were applied".
 
-**Ainda não está em produção.**
+**Em produção desde 06/10/2026:** backend `c4db0b8`, frontend `f1da2b2`
+(bundle `main-I6TPAV3P.js`), APK **1.4** (`versionCode 5`, mesma chave). Backups anteriores:
+`~/backups/antes_agenda_eventos_20261006_1850.dump` e `~/backups/www_antes_agenda_20261006_1851.tgz`.
+
+A migration `EventosAgenda` subiu limpa (confirmada no `__EFMigrationsHistory`), as 16 views de BI
+voltaram e as **1241** ocorrências ficaram intactas. Conferido em produção: bundle novo servido,
+`/agenda/eventos` pedindo token (401) e a ficha de uma ocorrência real gerando .docx de 566 KB
+sem nenhum marcador por substituir.
 
 ---
 
