@@ -1073,6 +1073,50 @@ namespace SIG_Defesa_Civil.API.Controllers
         }
 
         /// <summary>
+        /// Baixa a ficha de vistoria (o "Registro de Ocorrência" oficial) já preenchida
+        /// com o que se sabe da ocorrência até agora, para imprimir e levar a campo.
+        /// </summary>
+        /// <remarks>
+        /// Disponível em <b>qualquer fase</b>: o que ainda não existe sai em branco.
+        /// Nada é gravado — o arquivo é montado na hora e devolvido direto, sem ocupar
+        /// a Central de Documentos nem a tabela de arquivos.
+        /// </remarks>
+        /// <param name="id">ID da ocorrência</param>
+        /// <response code="200">Ficha gerada</response>
+        /// <response code="404">Ocorrência não encontrada</response>
+        /// <response code="503">Template ausente ou falha ao montar o arquivo</response>
+        // GET /api/v1/ocorrencias/{id}/ficha-vistoria
+        [HttpGet("{id:int}/ficha-vistoria")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> BaixarFichaVistoria([FromRoute] int id)
+        {
+            try
+            {
+                var bytes = await _relatorioService.GerarFichaVistoriaAsync(id);
+
+                return File(
+                    bytes,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    $"ficha_vistoria_{id}.docx");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrada"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Falha ao gerar a ficha de vistoria da ocorrência {Id}", id);
+                return StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
+                    ApiResponse<object>.Error(
+                        "Erro ao montar a ficha. Verifique o template e tente novamente.",
+                        ErrosRequisicoes.ERRO_INTERNO));
+            }
+        }
+
+        /// <summary>
         /// Remove o registro do relatório final da ocorrência, permitindo que um novo seja gerado.
         /// O arquivo físico permanece no storage como backup.
         /// </summary>
@@ -1108,8 +1152,14 @@ namespace SIG_Defesa_Civil.API.Controllers
         {
             var erros = new List<string>();
 
+            // Obrigatórios da abertura: nome, telefone de contato e o endereço
+            // (sem CEP). Todo o resto é opcional — o atendimento muitas vezes começa
+            // com o pouco que o solicitante sabe informar por telefone.
             if (string.IsNullOrWhiteSpace(request.Cidadao?.Nome))
                 erros.Add("Nome do cidadão é obrigatório");
+
+            if (string.IsNullOrWhiteSpace(request.Cidadao?.Celular))
+                erros.Add("Telefone de contato do cidadão é obrigatório");
 
             // CPF e e-mail são opcionais: boa parte dos atendimentos chega por
             // telefone ou balcão, sem o documento em mãos. Quando vêm preenchidos,
@@ -1129,9 +1179,6 @@ namespace SIG_Defesa_Civil.API.Controllers
 
             if (string.IsNullOrWhiteSpace(request.Local?.Uf) || request.Local.Uf.Length != 2)
                 erros.Add("UF é obrigatória (2 caracteres)");
-
-            if (string.IsNullOrWhiteSpace(request.DescricaoProblema))
-                erros.Add("Descrição do problema é obrigatória");
 
             return erros;
         }

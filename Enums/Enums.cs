@@ -81,6 +81,12 @@
     /// <summary>Turno da visita agendada.</summary>
     public enum TurnoVistoria { MANHA, TARDE }
 
+    /// <summary>
+    /// Parte do dia ocupada por um evento da agenda. DIA_TODO cobre os dois turnos —
+    /// é o caso de feriado e férias, por isso é o padrão.
+    /// </summary>
+    public enum PeriodoEventoAgenda { MANHA, TARDE, DIA_TODO }
+
     // ─── Etapa 4 — Vistoria Presencial ───────────────────────────────────────────
     // Os campos de seleção da vistoria (edificação, estrutura, tipo de risco, grau,
     // áreas afetadas, interdição, remoção, motivação, orientações, caracterização)

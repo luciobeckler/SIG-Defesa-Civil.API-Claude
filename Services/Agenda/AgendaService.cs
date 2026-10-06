@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using SIG_Defesa_Civil.API.Data.DTO.Requests.Agenda;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Agenda;
+using SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia;
 using SIG_Defesa_Civil.API.Data.Models;
 using SIG_Defesa_Civil.API.Data.Models.Tabelas;
 using SIG_Defesa_Civil.API.Enums;
@@ -40,6 +42,117 @@ namespace SIG_Defesa_Civil.API.Services.Agenda
 
             return agendamentos.Select(Mapear).ToList();
         }
+
+        // ── Eventos (indisponibilidade da equipe) ────────────────────────────────
+
+        public async Task<List<EventoAgendaDto>> ListarEventosAsync(DateOnly inicio, DateOnly fim)
+        {
+            if (fim < inicio)
+                throw new InvalidOperationException("A data final não pode ser anterior à data inicial.");
+
+            // Sobreposição de intervalos: começa antes do fim da janela E termina depois
+            // do começo dela. Pega férias que atravessam a semana exibida.
+            var eventos = await _context.EventosAgenda
+                .Include(e => e.CriadoPor)
+                .Where(e => e.DataInicio <= fim && e.DataFim >= inicio)
+                .OrderBy(e => e.DataInicio)
+                .ThenBy(e => e.Periodo)
+                .ToListAsync();
+
+            return eventos.Select(MapearEvento).ToList();
+        }
+
+        public async Task<EventoAgendaDto> CriarEventoAsync(
+            SalvarEventoAgendaRequest request, int usuarioId)
+        {
+            var (inicio, fim, periodo) = ValidarEvento(request);
+
+            var evento = new EventoAgenda
+            {
+                Titulo = request.Titulo.Trim(),
+                Observacao = string.IsNullOrWhiteSpace(request.Observacao)
+                    ? null
+                    : request.Observacao.Trim(),
+                DataInicio = inicio,
+                DataFim = fim,
+                Periodo = periodo,
+                CriadoPorId = usuarioId,
+                CriadoEm = DateTime.UtcNow,
+                AtualizadoEm = DateTime.UtcNow,
+            };
+
+            _context.EventosAgenda.Add(evento);
+            await _context.SaveChangesAsync();
+            await _context.Entry(evento).Reference(e => e.CriadoPor).LoadAsync();
+
+            _logger.LogInformation(
+                "Evento de agenda criado: {Titulo} ({Inicio} a {Fim}, {Periodo})",
+                evento.Titulo, evento.DataInicio, evento.DataFim, evento.Periodo);
+
+            return MapearEvento(evento);
+        }
+
+        public async Task<EventoAgendaDto> AtualizarEventoAsync(
+            int eventoId, SalvarEventoAgendaRequest request)
+        {
+            var evento = await _context.EventosAgenda
+                .Include(e => e.CriadoPor)
+                .FirstOrDefaultAsync(e => e.Id == eventoId)
+                ?? throw new InvalidOperationException($"Evento {eventoId} não encontrado.");
+
+            var (inicio, fim, periodo) = ValidarEvento(request);
+
+            evento.Titulo = request.Titulo.Trim();
+            evento.Observacao = string.IsNullOrWhiteSpace(request.Observacao)
+                ? null
+                : request.Observacao.Trim();
+            evento.DataInicio = inicio;
+            evento.DataFim = fim;
+            evento.Periodo = periodo;
+            evento.AtualizadoEm = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return MapearEvento(evento);
+        }
+
+        public async Task ExcluirEventoAsync(int eventoId)
+        {
+            var evento = await _context.EventosAgenda.FirstOrDefaultAsync(e => e.Id == eventoId)
+                ?? throw new InvalidOperationException($"Evento {eventoId} não encontrado.");
+
+            // Some de vez: evento é anotação de agenda, não tem histórico a preservar.
+            _context.EventosAgenda.Remove(evento);
+            await _context.SaveChangesAsync();
+        }
+
+        private static (DateOnly inicio, DateOnly fim, PeriodoEventoAgenda periodo) ValidarEvento(
+            SalvarEventoAgendaRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Titulo))
+                throw new InvalidOperationException("Informe um título para o evento.");
+
+            if (request.DataFim < request.DataInicio)
+                throw new InvalidOperationException(
+                    "A data final não pode ser anterior à data inicial.");
+
+            if (!Enum.TryParse<PeriodoEventoAgenda>(request.Periodo, ignoreCase: true, out var periodo))
+                throw new InvalidOperationException(
+                    "Período inválido. Use MANHA, TARDE ou DIA_TODO.");
+
+            return (request.DataInicio, request.DataFim, periodo);
+        }
+
+        private static EventoAgendaDto MapearEvento(EventoAgenda e) => new()
+        {
+            Id = e.Id,
+            Titulo = e.Titulo,
+            Observacao = e.Observacao,
+            DataInicio = e.DataInicio,
+            DataFim = e.DataFim,
+            Periodo = e.Periodo.ToString(),
+            CriadoPor = e.CriadoPor?.Nome,
+            CriadoEm = e.CriadoEm,
+        };
 
         public async Task<AgendaItemDto> MoverAsync(
             int ocorrenciaId,

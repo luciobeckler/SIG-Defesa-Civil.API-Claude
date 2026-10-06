@@ -356,6 +356,73 @@ Sugerido calcular do cache local — não implementado.
 
 ---
 
+## 🧾 Obrigatórios mínimos, ficha de vistoria e eventos da agenda (06/10/2026)
+
+### 1. Só nome, endereço (sem CEP) e telefone travam a abertura
+Decisões do usuário: "endereço" = logradouro + bairro + cidade + UF (número, complemento e
+**CEP** opcionais); o telefone obrigatório é o **celular**; a **descrição virou opcional**.
+
+- `ValidarRequest` passou a exigir celular e deixou de exigir descrição.
+- `CriarOcorrenciaRequest.DescricaoProblema` virou `string?`. A coluna é **NOT NULL**, então
+  descrição ausente é gravada como **texto vazio** — sem migration.
+- Front: `cep` usa `validarDigitosOpcional(8)`, `numero` e `descricaoProblema` sem `required`.
+  CEP e descrição em branco vão como **null**, não `""`: os dois têm restrição de tamanho no
+  contrato e string vazia reprovaria.
+
+⚠️ **DataAnnotations do `CriarOcorrenciaRequest` não são validados.** Esse DTO chega como JSON
+dentro do campo `Dados` do multipart e é desserializado **à mão** no controller — o ModelState
+não roda. Valem só para o Swagger; quem reprova é `ValidarRequest`. Por isso o mínimo de 10
+caracteres da descrição é cobrado **só pelo formulário** (e pela API na edição, que é
+`[FromBody]` de verdade). Descoberto por ensaio: o build passava e a tela parecia certa.
+
+### 2. Ficha de vistoria baixável em qualquer fase
+O template **já existia** no servidor (`/arquivos/templates/Ficha de vistoria - Modelo
+Oficial.docx`, o "REGISTRO DE OCORRÊNCIA"), com **31 marcadores**. Só faltava gerar.
+
+- `RelatorioService.GerarFichaVistoriaAsync(ocorrenciaId)` devolve `byte[]` e **não grava nada**:
+  sem storage, sem linha em `arquivos`. Campos que ainda não existem saem em branco.
+- `GET /api/v1/ocorrencias/{id}/ficha-vistoria` → o .docx direto.
+- Botão na **Central de Documentos** (`admin/ocorrencias/:id/documentos`), fora do fluxo de
+  etapas justamente para estar ao alcance em qualquer fase.
+- Antes da vistoria, `<<DATA_VISTORIA>>` usa a data **agendada** — é ela que a equipe leva impressa.
+- ⚠️ O template escreve `<<HORARO_TENTATIVA_1..3>>` (sem o I). O código repete o erro de
+  propósito: a tag tem de bater com o arquivo.
+- `appsettings.json` ganhou `TemplateSettings:Templates:FichaVistoria`.
+
+### 3. Eventos na agenda (indisponibilidade da equipe)
+Decisões do usuário: **avisa e deixa seguir** (não bloqueia) e **intervalo de datas**.
+
+- Tabela nova `eventos_agenda` (migration `20261006182027_EventosAgenda`): título, observação,
+  `DataInicio`/`DataFim`, `Periodo` (MANHA/TARDE/DIA_TODO, texto), quem criou.
+  **Só cria tabela** — não altera coluna, então não esbarra nas views de BI.
+- `GET/POST/PUT/DELETE /api/v1/agenda/eventos`. A listagem usa sobreposição de intervalos
+  (`DataInicio <= fim && DataFim >= inicio`), para férias que atravessam a semana aparecerem.
+- Tela: botão "Evento" no cabeçalho e um "+" por turno (abre já com dia e período preenchidos).
+  Evento de dia inteiro vira faixa sob o cabeçalho do dia; evento de turno fica dentro do bloco.
+  Turno ocupado recebe listras diagonais. Clicar na faixa abre para editar/excluir.
+- Soltar um card num período ocupado abre "Período ocupado — Há *X* neste período. Agendar mesmo
+  assim?". Cancelar mantém o card no lugar; confirmar move normalmente.
+- O contêiner `.eventos-dia` existe **mesmo vazio** (`min-height`): sem ele, os dias sem evento
+  sobem e as colunas da semana deixam de se alinhar.
+- Escopo: o evento vale para a **equipe toda**. Ausência de um vistoriador específico seria outro
+  desenho e não foi feita.
+
+⚠️ **Lacuna conhecida:** o aviso existe só no arrastar-e-soltar da agenda. Agendar pela tela de
+detalhe da ocorrência (etapa 3) **não avisa** sobre evento no período.
+
+### Validação
+Ensaios de ponta a ponta contra a API real (PostgreSQL descartável na 55432):
+**26 verificações** para obrigatórios + ficha (`scratchpad/testar_obrigatorios_e_ficha.py`) e
+**22** para os eventos (`scratchpad/testar_eventos_agenda.py`). A agenda foi conferida também na
+tela, com os dois caminhos do aviso.
+
+⚠️ Lembrete que custou um ciclo: depois de `dotnet ef migrations add`, **rodar `dotnet build`**
+antes de subir a API, senão ela carrega a DLL antiga e loga "No migrations were applied".
+
+**Ainda não está em produção.**
+
+---
+
 ## 🪪 CPF e e-mail opcionais na ocorrência (05/10/2026)
 
 Pedido do usuário: boa parte dos atendimentos chega por telefone ou balcão, sem documento em mãos

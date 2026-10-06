@@ -8,6 +8,7 @@ using SIG_Defesa_Civil.API.Data.Models.Tabelas;
 using SIG_Defesa_Civil.API.Enums;
 using SIG_Defesa_Civil.API.Services.Storage;
 using EncaminhamentoEnum = SIG_Defesa_Civil.API.Enums.Encaminhamento;
+using TentativaVistoria = SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia.TentativaVistoria;
 
 namespace SIG_Defesa_Civil.API.Services.Relatorio
 {
@@ -21,6 +22,9 @@ namespace SIG_Defesa_Civil.API.Services.Relatorio
         // Nome determinístico: uma ocorrência → um relatório final
         private static string NomeRelatorio(int ocorrenciaId) =>
             $"relatorio_final_{ocorrenciaId}.docx";
+
+        /// <summary>Horas no formato hh:mm — escapado porque ':' é separador de formato.</summary>
+        private const string FORMATO_HORA = @"hh\:mm";
 
         public RelatorioService(
             DefesaCivilContext context,
@@ -169,6 +173,112 @@ namespace SIG_Defesa_Civil.API.Services.Relatorio
                 ocorrencia.Protocolo, vistoriaId, usuarioId);
 
             return caminho;
+        }
+
+        // ── Ficha de vistoria (rascunho para levar a campo) ──────────────────────────
+
+        public async Task<byte[]> GerarFichaVistoriaAsync(int ocorrenciaId)
+        {
+            var ocorrencia = await _context.Ocorrencias
+                .Include(o => o.Localizacao)
+                .Include(o => o.AvaliacaoRisco)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador2)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Tentativas)
+                .Include(o => o.Vistorias)
+                .Where(o => o.DeletedAt == null)
+                .FirstOrDefaultAsync(o => o.Id == ocorrenciaId)
+                ?? throw new InvalidOperationException($"Ocorrência {ocorrenciaId} não encontrada.");
+
+            // Quase tudo daqui para baixo pode não existir ainda: a ficha é baixável
+            // desde a abertura. O que falta sai em branco, para completar à mão.
+            var loc  = ocorrencia.Localizacao;
+            var sol  = ocorrencia.Solicitante;
+            var aval = ocorrencia.AvaliacaoRisco;
+
+            var agendamento = ocorrencia.Agendamentos
+                .OrderByDescending(a => a.Numero)
+                .FirstOrDefault();
+
+            var vistoria = ocorrencia.Vistorias
+                .OrderByDescending(v => v.Numero)
+                .FirstOrDefault();
+
+            var tentativas = agendamento?.Tentativas
+                .OrderBy(t => t.NumeroTentativa)
+                .ToList() ?? new List<TentativaVistoria>();
+
+            var tags = new Dictionary<string, string>
+            {
+                ["<<PROTOCOLO>>"]           = ocorrencia.Protocolo,
+                ["<<DATA_SOLICITACAO>>"]    = ocorrencia.AbertaEm.ToLocalTime().ToString("dd/MM/yyyy"),
+                ["<<HORARIO_SOLICITACAO>>"] = ocorrencia.AbertaEm.ToLocalTime().ToString("HH:mm"),
+                ["<<EMERGENCIA>>"]          = aval == null ? string.Empty : (aval.Emergencia ? "SIM" : "NÃO"),
+                ["<<DESCRICAO>>"]           = ocorrencia.DescricaoProblema,
+
+                ["<<NOME>>"]       = sol?.Nome    ?? string.Empty,
+                ["<<CPF>>"]        = sol?.Cpf     ?? string.Empty,
+                ["<<IDENTIDADE>>"] = sol?.Rg      ?? string.Empty,
+                ["<<CELULAR>>"]    = sol?.Celular ?? string.Empty,
+                ["<<EMAIL>>"]      = sol?.Email   ?? string.Empty,
+
+                ["<<ENDERECO>>"]    = loc?.Endereco    ?? string.Empty,
+                ["<<NUMERO>>"]      = loc?.Numero      ?? string.Empty,
+                ["<<COMPLEMENTO>>"] = loc?.Complemento ?? string.Empty,
+                ["<<BAIRRO>>"]      = loc?.Bairro      ?? string.Empty,
+                ["<<CEP>>"]         = loc?.Cep         ?? string.Empty,
+                ["<<COORDENADA>>"]  = loc?.Coordenada  ?? string.Empty,
+                ["<<REFERENCIA>>"]  = loc?.Referencia  ?? string.Empty,
+                ["<<NUMERO_IPTU>>"] = loc?.NumeroIptu  ?? string.Empty,
+
+                // Antes da vistoria vale a data agendada — é ela que a equipe leva impressa.
+                ["<<DATA_VISTORIA>>"] = vistoria?.DataVistoria.ToString("dd/MM/yyyy")
+                                        ?? agendamento?.Data?.ToString("dd/MM/yyyy")
+                                        ?? string.Empty,
+                ["<<HORARIO_INICIO_VISTORIA>>"]  = vistoria?.HorarioInicio.ToString(FORMATO_HORA) ?? string.Empty,
+                ["<<HORARIO_TERMINO_VISTORIA>>"] = vistoria?.HorarioTermino.ToString(FORMATO_HORA) ?? string.Empty,
+
+                ["<<NOME_VISTORIADOR_1>>"]      = agendamento?.Vistoriador1?.Nome      ?? string.Empty,
+                ["<<MATRICULA_VISTORIADOR_1>>"] = agendamento?.Vistoriador1?.Matricula ?? string.Empty,
+                ["<<NOME_VISTORIADOR_2>>"]      = agendamento?.Vistoriador2?.Nome      ?? string.Empty,
+                ["<<MATRICULA_VISTORIADOR_2>>"] = agendamento?.Vistoriador2?.Matricula ?? string.Empty,
+            };
+
+            // O template oficial escreve "HORARO_TENTATIVA" (sem o I). Mantido assim de
+            // propósito: a tag tem de bater com o arquivo, não com a grafia correta.
+            for (int i = 0; i < 3; i++)
+            {
+                var t = tentativas.ElementAtOrDefault(i);
+                var idx = i + 1;
+                tags[$"<<DATA_TENTATIVA_{idx}>>"] =
+                    t?.DataHoraTentativa.ToLocalTime().ToString("dd/MM/yyyy") ?? string.Empty;
+                tags[$"<<HORARO_TENTATIVA_{idx}>>"] =
+                    t?.DataHoraTentativa.ToLocalTime().ToString("HH:mm") ?? string.Empty;
+            }
+
+            if (!_templateSettings.Templates.TryGetValue("FichaVistoria", out var templateFileName))
+                throw new InvalidOperationException("Template 'FichaVistoria' não configurado em TemplateSettings.");
+
+            var templatePath = Path.Combine(_templateSettings.CaminhoRaiz, templateFileName);
+            if (!File.Exists(templatePath))
+                throw new InvalidOperationException($"Arquivo de template não encontrado: {templatePath}");
+
+            byte[] templateBytes = await File.ReadAllBytesAsync(templatePath);
+            using var ms = new MemoryStream();
+            await ms.WriteAsync(templateBytes);
+            ms.Position = 0;
+
+            using (var wordDoc = WordprocessingDocument.Open(ms, true))
+            {
+                SubstituirTags(wordDoc, tags);
+                wordDoc.Save();
+            }
+
+            _logger.LogInformation(
+                "Ficha de vistoria gerada (sem gravação) para ocorrência {Protocolo}",
+                ocorrencia.Protocolo);
+
+            return ms.ToArray();
         }
 
         // ── Exclusão ─────────────────────────────────────────────────────────────────

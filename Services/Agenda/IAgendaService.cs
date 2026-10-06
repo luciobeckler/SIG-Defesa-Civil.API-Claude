@@ -1,3 +1,4 @@
+using SIG_Defesa_Civil.API.Data.DTO.Requests.Agenda;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Agenda;
 
@@ -23,5 +24,19 @@ namespace SIG_Defesa_Civil.API.Services.Agenda
             int agendamentoId,
             MoverAgendamentoRequest request,
             int usuarioId);
+
+        // ── Eventos (indisponibilidade da equipe) ────────────────────────────────
+
+        /// <summary>
+        /// Eventos que tocam o intervalo [inicio, fim] — inclusive os que começam antes
+        /// ou terminam depois dele, já que a semana exibida pode cair no meio de férias.
+        /// </summary>
+        Task<List<EventoAgendaDto>> ListarEventosAsync(DateOnly inicio, DateOnly fim);
+
+        Task<EventoAgendaDto> CriarEventoAsync(SalvarEventoAgendaRequest request, int usuarioId);
+
+        Task<EventoAgendaDto> AtualizarEventoAsync(int eventoId, SalvarEventoAgendaRequest request);
+
+        Task ExcluirEventoAsync(int eventoId);
     }
 }

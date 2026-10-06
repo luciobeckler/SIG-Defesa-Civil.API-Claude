@@ -26,6 +26,7 @@
         public DbSet<Notificado> Notificados { get; set; }
         public DbSet<EncaminhamentoFinal> EncaminhamentosFinais { get; set; }
         public DbSet<OpcaoCampoVistoria> OpcoesCampoVistoria { get; set; }
+        public DbSet<EventoAgenda> EventosAgenda { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -290,6 +291,26 @@
 
                 // Não permite a mesma opção duplicada no mesmo campo
                 entity.HasIndex(o => new { o.Campo, o.Valor }).IsUnique();
+            });
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // EVENTO DA AGENDA (indisponibilidade da equipe)
+            // ═══════════════════════════════════════════════════════════════════════
+            modelBuilder.Entity<EventoAgenda>(entity =>
+            {
+                entity.Property(e => e.Periodo).HasConversion<string>();
+                entity.Property(e => e.Titulo).HasMaxLength(120);
+                entity.Property(e => e.Observacao).HasMaxLength(500);
+
+                // A agenda é sempre consultada por intervalo de datas.
+                entity.HasIndex(e => new { e.DataInicio, e.DataFim });
+
+                // Apagar quem cadastrou não pode levar o evento junto: o compromisso
+                // é da equipe, não da pessoa que digitou.
+                entity.HasOne(e => e.CriadoPor)
+                    .WithMany()
+                    .HasForeignKey(e => e.CriadoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ═══════════════════════════════════════════════════════════════════════

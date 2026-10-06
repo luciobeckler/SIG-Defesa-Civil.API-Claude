@@ -68,7 +68,8 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 {
                     Protocolo = protocolo,
                     Solicitante = solicitante,
-                    DescricaoProblema = request.DescricaoProblema,
+                    // A coluna é NOT NULL; descrição ausente vira texto vazio.
+                    DescricaoProblema = request.DescricaoProblema ?? string.Empty,
                     Status = StatusOcorrencia.ABERTA,
                     CriadoPorId = null,   // abertura pública — sem usuário autenticado
                     AbertaEm = DateTime.UtcNow,

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SIG_Defesa_Civil.API.Data.DTO.Requests.Agenda;
 using SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias;
 using SIG_Defesa_Civil.API.Data.DTO.Responses.Agenda;
 using SIG_Defesa_Civil.API.Services;
@@ -52,6 +53,121 @@ namespace SIG_Defesa_Civil.API.Controllers
             catch (Exception ex)
             {
                 return ErroInterno(ex, _logger, $"ListarAgenda(inicio={inicio}, fim={fim})");
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // EVENTOS DA AGENDA — indisponibilidade da equipe
+        // ══════════════════════════════════════════════════════════════════════════
+        // Um evento não bloqueia o agendamento: a tela avisa e deixa seguir, porque
+        // emergência não pode ficar travada por um compromisso marcado semanas antes.
+
+        /// <summary>
+        /// Lista os eventos que tocam o intervalo informado — inclusive os que começam
+        /// antes ou terminam depois dele.
+        /// </summary>
+        /// <param name="inicio">Data inicial do período (YYYY-MM-DD)</param>
+        /// <param name="fim">Data final do período (YYYY-MM-DD)</param>
+        /// <response code="200">Lista de eventos (pode ser vazia)</response>
+        /// <response code="422">Intervalo de datas inválido</response>
+        [HttpGet("agenda/eventos")]
+        [ProducesResponseType(typeof(ApiResponse<List<EventoAgendaDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> ListarEventos(
+            [FromQuery] DateOnly inicio,
+            [FromQuery] DateOnly fim)
+        {
+            try
+            {
+                var eventos = await _agendaService.ListarEventosAsync(inicio, fim);
+                return Ok(ApiResponse<List<EventoAgendaDto>>.Success(eventos));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"ListarEventos(inicio={inicio}, fim={fim})");
+            }
+        }
+
+        /// <summary>Cadastra um evento que ocupa a agenda da equipe.</summary>
+        /// <response code="201">Evento criado</response>
+        /// <response code="422">Dados inválidos (título vazio, período desconhecido, fim antes do início)</response>
+        [HttpPost("agenda/eventos")]
+        [ProducesResponseType(typeof(ApiResponse<EventoAgendaDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> CriarEvento([FromBody] SalvarEventoAgendaRequest request)
+        {
+            try
+            {
+                var evento = await _agendaService.CriarEventoAsync(request, ObterUsuarioIdInterno());
+                return StatusCode(
+                    StatusCodes.Status201Created,
+                    ApiResponse<EventoAgendaDto>.Success(evento, "Evento cadastrado na agenda."));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, "CriarEvento");
+            }
+        }
+
+        /// <summary>Edita um evento da agenda.</summary>
+        /// <response code="200">Evento atualizado</response>
+        /// <response code="404">Evento não encontrado</response>
+        /// <response code="422">Dados inválidos</response>
+        [HttpPut("agenda/eventos/{eventoId:int}")]
+        [ProducesResponseType(typeof(ApiResponse<EventoAgendaDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> AtualizarEvento(
+            [FromRoute] int eventoId,
+            [FromBody] SalvarEventoAgendaRequest request)
+        {
+            try
+            {
+                var evento = await _agendaService.AtualizarEventoAsync(eventoId, request);
+                return Ok(ApiResponse<EventoAgendaDto>.Success(evento, "Evento atualizado."));
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não encontrado"))
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ErroNegocio(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"AtualizarEvento({eventoId})");
+            }
+        }
+
+        /// <summary>Remove um evento da agenda.</summary>
+        /// <response code="204">Evento removido</response>
+        /// <response code="404">Evento não encontrado</response>
+        [HttpDelete("agenda/eventos/{eventoId:int}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ExcluirEvento([FromRoute] int eventoId)
+        {
+            try
+            {
+                await _agendaService.ExcluirEventoAsync(eventoId);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NaoEncontrado(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, $"ExcluirEvento({eventoId})");
             }
         }
 
