@@ -356,6 +356,51 @@ Sugerido calcular do cache local — não implementado.
 
 ---
 
+## 🔓 Acompanhamento público e filtro por protocolo (09/10/2026)
+
+### 1. O CPF opcional tinha trancado o munícipe para fora — e aberto uma porta
+`AcompanharAsync` comparava só o CPF. Ocorrência sem CPF guardava string vazia, então:
+
+- o munícipe digitava o próprio CPF e levava **403** — sem caminho nenhum pela tela;
+- qualquer texto sem dígito (`-`, `abc`) normalizava para vazio **e batia com o vazio gravado**,
+  liberando a consulta a quem soubesse o protocolo — que é **sequencial**. A tela exigia 11 dígitos,
+  mas o endpoint é público e aceita `curl`. Reproduzido e medido antes de corrigir.
+
+Não nasceu com o CPF opcional: os registros importados das planilhas já entravam sem CPF.
+
+Correção: `ConfereSolicitante` aceita **CPF, celular ou telefone fixo**, comparando só dígitos, e
+**valor vazio nunca confere**. `TemComoConferir` separa o caso de não haver nada conferível, que
+responde 403 com `ErrosRequisicoes.SEM_COMO_CONFERIR` e orienta procurar a Defesa Civil — antes caía
+no catch genérico e virava **404**, dizendo "protocolo não encontrado" para protocolo que existe.
+Vale igual para o download público do relatório. O parâmetro virou `identificacao`; **`cpf` continua
+aceito** para não quebrar links salvos.
+
+**Na base de produção:** dos 348 sem CPF, **335 têm telefone** e são resgatados; só **13** caem na
+mensagem de balcão.
+
+### 2. Filtro por protocolo não respondia depois da primeira busca
+`textoDebounce$` era `Subject<void>`: todo `next()` emitia `undefined` e o `distinctUntilChanged()`
+do pipe descartava tudo a partir da segunda. A busca funcionava **uma vez** e parava até recarregar
+a página — valia também para bairro e CPF digitados. Anterior às mudanças desta semana (commits de
+maio e junho). Agora o subject carrega o texto dos campos, que é o que o operador deveria comparar.
+
+### Validação
+20 verificações contra a API local (`scratchpad/testar_acompanhar.py` e `testar_sem_conferir.py`),
+mais a cadeia RxJS exercitada com o rxjs do projeto: 3 termos distintos davam **1 busca** antes e
+dão **3** agora. Em produção: telefone abre (200), traço recusa (`ACESSO_NEGADO`), número errado 403,
+`?cpf=` antigo segue funcionando.
+
+**Em produção desde 09/10/2026:** backend `21affd9`, frontend `633e62e` (bundle `main-Q4SUKDKA.js`),
+APK **1.5** (`versionCode 6`, mesma chave). Backups: `~/backups/antes_acompanhar_20261009_1158.dump`
+e `~/backups/www_antes_acompanhar_20261009_1159.tgz`.
+
+⚠️ **O servidor ficou inalcançável por ~2 dias** (09/10 de manhã: SSH e 8081 sem resposta nos dois
+IPs, com internet local funcionando). Voltou sozinho; `uptime` de 122 dias mostra que a máquina não
+reiniciou — foi o link, não o servidor. O IP externo segue recusando a chave SSH: deploy só de dentro
+da rede da prefeitura.
+
+---
+
 ## 🧾 Obrigatórios mínimos, ficha de vistoria e eventos da agenda (06/10/2026)
 
 ### 1. Só nome, endereço (sem CEP) e telefone travam a abertura
