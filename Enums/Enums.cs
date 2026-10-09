@@ -15,7 +15,13 @@
     {
         UPLOAD_FAILED, ERRO_PROCESSAMENTO, ARQUIVO_MUITO_GRANDE, ARQUIVOS_AUSENTES,
         VALIDACAO_FALHOU, DADOS_INVALIDOS, JSON_INVALIDO, DADOS_AUSENTES, ERRO_INTERNO,
-        ACESSO_NEGADO
+        ACESSO_NEGADO,
+        /// <summary>
+        /// A ocorrência não guarda CPF nem telefone, então a consulta pública não tem
+        /// como confirmar a identidade de quem pergunta. Não adianta tentar de novo —
+        /// a tela usa este código para orientar a procurar a Defesa Civil.
+        /// </summary>
+        SEM_COMO_CONFERIR
     }
     public enum StorageErrorType
     {

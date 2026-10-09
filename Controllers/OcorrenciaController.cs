@@ -165,10 +165,14 @@ namespace SIG_Defesa_Civil.API.Controllers
         /// Retorna dados mascarados (LGPD). Não requer autenticação.
         /// </summary>
         /// <param name="protocolo">Número do protocolo (ex: 2026-0001)</param>
-        /// <param name="cpf">CPF do solicitante (somente dígitos ou formatado)</param>
+        /// <param name="cpf">
+        /// CPF, celular ou telefone fixo do solicitante — o documento é opcional na
+        /// abertura, então o telefone também identifica. O nome do parâmetro continua
+        /// <c>cpf</c> para não quebrar links já salvos; <c>identificacao</c> é o apelido novo.
+        /// </param>
         /// <response code="200">Detalhe mascarado da ocorrência</response>
-        /// <response code="400">Protocolo ou CPF não informados</response>
-        /// <response code="403">CPF não corresponde ao solicitante</response>
+        /// <response code="400">Protocolo ou identificação não informados</response>
+        /// <response code="403">A identificação não corresponde ao solicitante, ou a ocorrência não tem como ser conferida</response>
         /// <response code="404">Protocolo não encontrado</response>
         [HttpGet("acompanhar")]
         [ProducesResponseType(typeof(ApiResponse<OcorrenciaDetalheDto>), StatusCodes.Status200OK)]
@@ -177,21 +181,32 @@ namespace SIG_Defesa_Civil.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> AcompanharSolicitacao(
             [FromQuery] string protocolo,
-            [FromQuery] string cpf)
+            [FromQuery] string? cpf,
+            [FromQuery] string? identificacao)
         {
-            if (string.IsNullOrWhiteSpace(protocolo) || string.IsNullOrWhiteSpace(cpf))
+            var informado = !string.IsNullOrWhiteSpace(identificacao) ? identificacao : cpf;
+
+            if (string.IsNullOrWhiteSpace(protocolo) || string.IsNullOrWhiteSpace(informado))
                 return BadRequest(ApiResponse<object>.Error(
-                    "Protocolo e CPF são obrigatórios", ErrosRequisicoes.DADOS_AUSENTES));
+                    "Informe o protocolo e o CPF ou celular do solicitante",
+                    ErrosRequisicoes.DADOS_AUSENTES));
 
             try
             {
-                var resultado = await _ocorrenciaService.AcompanharAsync(protocolo.Trim(), cpf.Trim());
+                var resultado = await _ocorrenciaService.AcompanharAsync(
+                    protocolo.Trim(), informado.Trim());
                 return Ok(ApiResponse<OcorrenciaDetalheDto>.Success(resultado));
             }
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden,
                     ApiResponse<object>.Error(ex.Message, ErrosRequisicoes.ACESSO_NEGADO));
+            }
+            // Antes do 404 genérico: não é protocolo inexistente, é protocolo sem como conferir.
+            catch (InvalidOperationException ex) when (ex.Message == OcorrenciaService.SEM_COMO_CONFERIR)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    ApiResponse<object>.Error(ex.Message, ErrosRequisicoes.SEM_COMO_CONFERIR));
             }
             catch (InvalidOperationException ex)
             {
@@ -755,11 +770,20 @@ namespace SIG_Defesa_Civil.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> BaixarRelatorioAcompanhamento(
             [FromQuery] string protocolo,
-            [FromQuery] string cpf)
+            [FromQuery] string? cpf,
+            [FromQuery] string? identificacao)
         {
+            var informado = !string.IsNullOrWhiteSpace(identificacao) ? identificacao : cpf;
+
+            if (string.IsNullOrWhiteSpace(protocolo) || string.IsNullOrWhiteSpace(informado))
+                return BadRequest(ApiResponse<object>.Error(
+                    "Informe o protocolo e o CPF ou celular do solicitante",
+                    ErrosRequisicoes.DADOS_AUSENTES));
+
             try
             {
-                var resultado = await _ocorrenciaService.ObterRelatorioAcompanhamentoAsync(protocolo, cpf);
+                var resultado = await _ocorrenciaService.ObterRelatorioAcompanhamentoAsync(
+                    protocolo, informado);
 
                 if (resultado == null)
                     return NaoEncontrado("O relatório final ainda não está disponível para esta ocorrência.");
@@ -772,6 +796,11 @@ namespace SIG_Defesa_Civil.API.Controllers
                 return StatusCode(
                     StatusCodes.Status403Forbidden,
                     ApiResponse<object>.Error(ex.Message, ErrosRequisicoes.ACESSO_NEGADO));
+            }
+            catch (InvalidOperationException ex) when (ex.Message == OcorrenciaService.SEM_COMO_CONFERIR)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    ApiResponse<object>.Error(ex.Message, ErrosRequisicoes.SEM_COMO_CONFERIR));
             }
             catch (InvalidOperationException ex)
             {

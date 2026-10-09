@@ -293,10 +293,9 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 "Ocorrência {Protocolo} restaurada pelo usuário {UsuarioId}", ocorrencia.Protocolo, usuarioId);
         }
 
+        /// <param name="cpf">CPF, celular ou telefone fixo do solicitante.</param>
         public async Task<OcorrenciaDetalheDto> AcompanharAsync(string protocolo, string cpf)
         {
-            var cpfNormalizado = new string(cpf.Where(char.IsDigit).ToArray());
-
             var ocorrencia = await _context.Ocorrencias
                 .Include(o => o.CriadoPor)
                 .Include(o => o.Localizacao)
@@ -316,10 +315,12 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 .FirstOrDefaultAsync(o => o.Protocolo == protocolo)
                 ?? throw new InvalidOperationException($"Protocolo '{protocolo}' não encontrado.");
 
-            var cpfSolicitante = new string((ocorrencia.Solicitante?.Cpf ?? "").Where(char.IsDigit).ToArray());
-            if (cpfSolicitante != cpfNormalizado)
+            if (!TemComoConferir(ocorrencia.Solicitante))
+                throw new InvalidOperationException(SEM_COMO_CONFERIR);
+
+            if (!ConfereSolicitante(ocorrencia.Solicitante, cpf))
                 throw new UnauthorizedAccessException(
-                    "O CPF informado não corresponde ao solicitante desta ocorrência.");
+                    "O CPF ou celular informado não corresponde ao solicitante desta ocorrência.");
 
             return MapearDetalhe(ocorrencia);
         }
@@ -923,18 +924,19 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         public async Task<(Stream Conteudo, string Nome, string ContentType)?> ObterRelatorioAcompanhamentoAsync(
             string protocolo, string cpf)
         {
-            var cpfNormalizado = new string(cpf.Where(char.IsDigit).ToArray());
-
             var ocorrencia = await _context.Ocorrencias
                 .Include(o => o.Arquivos)
                 .Where(o => o.DeletedAt == null)
                 .FirstOrDefaultAsync(o => o.Protocolo == protocolo)
                 ?? throw new InvalidOperationException($"Protocolo '{protocolo}' não encontrado.");
 
-            var cpfSolicitante = new string((ocorrencia.Solicitante?.Cpf ?? "").Where(char.IsDigit).ToArray());
-            if (cpfSolicitante != cpfNormalizado)
+            // Mesma porta da consulta pública: CPF, celular ou telefone fixo.
+            if (!TemComoConferir(ocorrencia.Solicitante))
+                throw new InvalidOperationException(SEM_COMO_CONFERIR);
+
+            if (!ConfereSolicitante(ocorrencia.Solicitante, cpf))
                 throw new UnauthorizedAccessException(
-                    "O CPF informado não corresponde ao solicitante desta ocorrência.");
+                    "O CPF ou celular informado não corresponde ao solicitante desta ocorrência.");
 
             // Prefere o PDF assinado; sem ele, cai para o relatório final gerado (.docx)
             var arquivo = ocorrencia.Arquivos
@@ -1193,6 +1195,47 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
                 AtualizadoEm = o.AtualizadoEm
             };
         }
+
+        /// <summary>
+        /// Mensagem devolvida quando a ocorrência não guarda nenhum dado conferível.
+        /// Fica aqui para as duas portas públicas (consulta e relatório) dizerem o mesmo.
+        /// </summary>
+        public const string SEM_COMO_CONFERIR =
+            "Este protocolo não tem CPF nem telefone registrados, então não é possível confirmar sua identidade pela internet. Procure a Defesa Civil de Sabará com um documento para consultar o andamento.";
+
+        /// <summary>
+        /// Confere a identidade do solicitante na consulta pública, aceitando
+        /// <b>CPF, celular ou telefone fixo</b> — só o CPF deixaria de fora quem abriu
+        /// o chamado por telefone, já que o documento virou opcional.
+        /// </summary>
+        /// <remarks>
+        /// Compara só dígitos. Um valor <b>vazio nunca confere</b>: antes, ocorrência sem
+        /// CPF guardava string vazia e qualquer texto sem dígito ("-", "abc") era
+        /// normalizado para vazio também, abrindo a consulta para quem soubesse o
+        /// protocolo — que é sequencial.
+        /// </remarks>
+        private static bool ConfereSolicitante(
+            Data.Entities.Tabelas.Ocorrencia.SolicitanteOcorrencia? solicitante,
+            string informado)
+        {
+            var digitado = SomenteDigitos(informado);
+            if (string.IsNullOrEmpty(digitado)) return false;
+
+            string?[] guardados = { solicitante?.Cpf, solicitante?.Celular, solicitante?.Telefone };
+            foreach (var guardado in guardados)
+            {
+                var valor = SomenteDigitos(guardado);
+                if (!string.IsNullOrEmpty(valor) && valor == digitado) return true;
+            }
+            return false;
+        }
+
+        /// <summary>`true` quando há ao menos um dado capaz de identificar o solicitante.</summary>
+        private static bool TemComoConferir(
+            Data.Entities.Tabelas.Ocorrencia.SolicitanteOcorrencia? solicitante) =>
+            !string.IsNullOrEmpty(SomenteDigitos(solicitante?.Cpf))
+            || !string.IsNullOrEmpty(SomenteDigitos(solicitante?.Celular))
+            || !string.IsNullOrEmpty(SomenteDigitos(solicitante?.Telefone));
 
         /// <summary>Mantém apenas os dígitos — usado para normalizar CPF antes de gravar/comparar.</summary>
         private static string? SomenteDigitos(string? valor) =>
