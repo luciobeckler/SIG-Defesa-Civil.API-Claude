@@ -1,15 +1,59 @@
-# HANDOFF — estado da sessão (31/07/2026)
+# HANDOFF — estado da sessão
 
 Documento de passagem de contexto para continuar em uma nova sessão do Claude Code.
 Leia junto com `CLAUDE.md` (arquitetura, como rodar, convenções). Datas em absoluto.
 
-> **Comece por aqui:** o código está commitado e no GitHub (`fc65c30` + este commit).
-> O `import.sql` está gerado e testado contra o banco local. **Falta apenas o deploy** —
-> ver "Pendências → 3". Nada disso existe no servidor ainda: ele faz `git pull` de `master`.
+---
+
+## 🧭 Comece por aqui — atualizado em 09/10/2026
+
+### O que está em produção agora
+Backend `21affd9`, frontend `633e62e` (bundle `main-Q4SUKDKA.js`), **APK 1.5** (`versionCode 6`).
+Base com **1244 ocorrências**. Servidor: `ssh luciobeckler@192.168.8.15`, projeto em `~/app`.
+App em `http://179.106.96.58:8081/` (ou `…58.sslip.io:8081`, que é clicável no WhatsApp).
+
+As seções datadas abaixo estão fora de ordem cronológica (foram inseridas no mesmo ponto);
+navegue pelas datas nos títulos, não pela posição.
+
+### ⚠️ Acesso ao servidor
+- **O IP externo recusa a chave SSH** (`179.106.96.58` → *Permission denied (publickey)*), embora a
+  porta 22 responda. O **IP interno `192.168.8.15` aceita** a mesma chave. Na prática: **deploy só de
+  dentro da rede da prefeitura**.
+- Em 07–09/10 o servidor ficou **inalcançável por ~2 dias** (SSH e 8081 mudos nos dois IPs, com
+  internet local funcionando). Voltou sozinho; `uptime` de 122 dias mostra que a máquina não
+  reiniciou — foi o link. Se repetir, não é preciso investigar o servidor.
+- O nginx responde a **qualquer Host** (`server_name _`), e `treino.179.106.96.58.sslip.io:8081`
+  já chega nele. Isso permite expor um segundo ambiente **sem mexer no roteador**, por um `server`
+  block adicional roteado por Host.
+
+### Fios abertos (nenhum começado)
+1. **Ambiente de treino (clone de produção).** Pedido em 09/10 para um treinamento remoto, com
+   6 ocorrências de ensaio. Desenho proposto: stack separado em `~/treino` (postgres com volume
+   próprio + API em `127.0.0.1:8090`), exposto via `treino.*` no nginx de produção. **Duas decisões
+   do usuário pendentes:** (a) que dados vão no clone — fictícios, cópia anonimizada ou cópia
+   integral de produção; (b) se autoriza o ajuste aditivo no `nginx.conf` de produção, que custa
+   alguns segundos de indisponibilidade. Não mexer no servidor antes dessas respostas.
+2. **CPF não é atualizado na edição da Etapa 1.** `AtualizarEtapa1Async` atualiza nome, e-mail,
+   telefone, celular, RG e órgão emissor — **`Cpf` não está na lista**. O campo aparece na tela e a
+   alteração é descartada em silêncio. Já está avisado no roteiro de treinamento.
+3. **Aviso de período ocupado só no arrastar-e-soltar da agenda.** Agendar pela tela da ocorrência
+   (etapa 3) não avisa sobre evento no período.
+4. **O aplicativo não mostra a versão em tela nenhuma.** Só dá para conferir em Configurações →
+   Aplicativos → Defesa Civil Sabara. Foi oferecido acrescentar essa linha e não foi pedido ainda.
+5. **Artigo SBC:** números do corpo do texto ainda desatualizados (linhas 48, 61, 299, 317, 328,
+   333–334 do `.tex`) e `diagnostico.png` a regerar.
+
+### Materiais entregues ao time (fora do repo)
+- **Guia de instalação e uso** (versão 1.4, compartilhado por link):
+  `https://claude.ai/artifact/BxQwnJu6jMh2t9FLxjqccT`
+- **Roteiro do treinamento** (3 h, documento editável, **ainda privado** — precisa ser
+  compartilhado pelo menu Share): `https://claude.ai/code/artifact/2a1bdbc4-4e46-4ac7-b6f7-2fe51d8a12f4`
+- **QR code** do sistema: `C:\Users\lucio\Desktop\TCC\qrcode-sistema-defesa-civil.png`
+  (gerador em `scratchpad/gerar_qr.py`; aponta para `…sslip.io:8081/`)
 
 ---
 
-## ✅ Entregue nesta sessão (29–31/07/2026)
+## ✅ Entregue na sessão de 29–31/07/2026
 
 Tudo compilando: backend `dotnet build` 0 erros, frontend `ng build` OK.
 
