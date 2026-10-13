@@ -22,17 +22,20 @@ namespace SIG_Defesa_Civil.API.Controllers
         private readonly IOcorrenciaService _ocorrenciaService;
         private readonly IStorageService _storageService;
         private readonly IRelatorioService _relatorioService;
+        private readonly IExportacaoOcorrenciaService _exportacaoService;
         private readonly ILogger<OcorrenciaController> _logger;
 
         public OcorrenciaController(
             IOcorrenciaService ocorrenciaService,
             IStorageService storageService,
             IRelatorioService relatorioService,
+            IExportacaoOcorrenciaService exportacaoService,
             ILogger<OcorrenciaController> logger)
         {
             _ocorrenciaService = ocorrenciaService;
             _storageService = storageService;
             _relatorioService = relatorioService;
+            _exportacaoService = exportacaoService;
             _logger = logger;
         }
 
@@ -215,6 +218,37 @@ namespace SIG_Defesa_Civil.API.Controllers
             catch (Exception ex)
             {
                 return ErroInterno(ex, _logger, $"AcompanharSolicitacao(protocolo={protocolo})");
+            }
+        }
+
+        /// <summary>
+        /// Exporta para .xlsx as ocorrências que o filtro atual seleciona.
+        /// </summary>
+        /// <remarks>
+        /// Usa exatamente o mesmo recorte da listagem — os parâmetros são os mesmos —
+        /// então o que a tela mostra é o que a planilha traz. <b>Sem dados do
+        /// solicitante</b>: o arquivo sai do sistema e perde o controle de acesso.
+        /// Teto de 20 mil linhas.
+        /// </remarks>
+        /// <response code="200">Planilha gerada</response>
+        // GET /api/v1/ocorrencias/exportar
+        [HttpGet("exportar")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> Exportar([FromQuery] FiltroOcorrenciaDto filtros)
+        {
+            try
+            {
+                var bytes = await _exportacaoService.ExportarAsync(filtros);
+                var nome = $"ocorrencias_{DateTime.Now:yyyy-MM-dd_HHmm}.xlsx";
+
+                return File(
+                    bytes,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    nome);
+            }
+            catch (Exception ex)
+            {
+                return ErroInterno(ex, _logger, "Exportar");
             }
         }
 
@@ -1208,6 +1242,11 @@ namespace SIG_Defesa_Civil.API.Controllers
 
             if (string.IsNullOrWhiteSpace(request.Local?.Uf) || request.Local.Uf.Length != 2)
                 erros.Add("UF é obrigatória (2 caracteres)");
+
+            // A equipe chega no local pelo ponto de referência: numeração costuma
+            // faltar nas áreas de risco, e sem referência a visita se perde.
+            if (string.IsNullOrWhiteSpace(request.Local?.Referencia))
+                erros.Add("Ponto de referência é obrigatório");
 
             return erros;
         }

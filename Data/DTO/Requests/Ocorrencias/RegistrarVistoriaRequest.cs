@@ -1,5 +1,7 @@
-using SIG_Defesa_Civil.API.Enums;
+﻿using SIG_Defesa_Civil.API.Enums;
+using SIG_Defesa_Civil.API.Helper;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
 {
@@ -25,7 +27,9 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
         // ── Caracterização do local ──────────────────────────────────────────────
         // Campos de seleção são texto: aceitam valores dos enums e opções personalizadas.
         public string? DescricaoDoLocal { get; set; }
-        public string? CaracterizacaoDoLocal { get; set; }
+        // Aceita o texto único que a fila offline de versões antigas guardou.
+        [JsonConverter(typeof(ListaOuTextoConverter))]
+        public List<string> CaracterizacaoDoLocal { get; set; } = new();
 
         [Required] public string Edificacao { get; set; } = string.Empty;
         [Required] public string Estrutura { get; set; } = string.Empty;
@@ -57,7 +61,9 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Requests.Ocorrencias
         [Required, MinLength(1, ErrorMessage = "Informe ao menos uma tipificação.")]
         public List<string> TipificacaoOcorrencia { get; set; } = new();
 
-        [Required] public string RegimeOcupacao { get; set; } = string.Empty;
+        [Required]
+        [JsonConverter(typeof(ListaOuTextoConverter))]
+        public List<string> RegimeOcupacao { get; set; } = new();
 
         // ── Conclusões ───────────────────────────────────────────────────────────
         /// <summary>Causas/motivações — multi-select.</summary>

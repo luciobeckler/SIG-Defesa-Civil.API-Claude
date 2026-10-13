@@ -245,10 +245,12 @@ SELECT
     fn_bi_valor(uv."TipoRisco")                         AS tipo_risco,
     fn_bi_valor(uv."Interdicao")                        AS interdicao,
     fn_bi_valor(uv."Remocao")                           AS remocao,
-    fn_bi_valor(uv."RegimeOcupacao")                    AS regime_ocupacao,
+    nullif(array_to_string(uv."RegimeOcupacao", '; '), '')   AS regime_ocupacao,
+    uv."RegimeOcupacao"                                 AS regime_ocupacao_lista,
     fn_bi_valor(uv."Edificacao")                        AS edificacao,
     fn_bi_valor(uv."Estrutura")                         AS estrutura,
-    fn_bi_valor(uv."CaracterizacaoDoLocal")             AS caracterizacao_local,
+    nullif(array_to_string(uv."CaracterizacaoDoLocal", '; '), '') AS caracterizacao_local,
+    uv."CaracterizacaoDoLocal"                          AS caracterizacao_local_lista,
     -- Risco alto é o recorte de prioridade da coordenação
     (fn_bi_normaliza(uv."GrauRiscoEncontrado") IN ('ALTO', 'MUITO ALTO', 'MUITO_ALTO')) AS risco_alto,
     (fn_bi_normaliza(uv."Interdicao") IN ('TOTAL', 'PARCIAL'))                          AS houve_interdicao,
@@ -362,10 +364,12 @@ SELECT
     fn_bi_valor(v."TipoRisco")                AS tipo_risco,
     fn_bi_valor(v."Interdicao")               AS interdicao,
     fn_bi_valor(v."Remocao")                  AS remocao,
-    fn_bi_valor(v."RegimeOcupacao")           AS regime_ocupacao,
+    nullif(array_to_string(v."RegimeOcupacao", '; '), '')  AS regime_ocupacao,
+    v."RegimeOcupacao"                        AS regime_ocupacao_lista,
     fn_bi_valor(v."Edificacao")               AS edificacao,
     fn_bi_valor(v."Estrutura")                AS estrutura,
-    fn_bi_valor(v."CaracterizacaoDoLocal")    AS caracterizacao_local,
+    nullif(array_to_string(v."CaracterizacaoDoLocal", '; '), '') AS caracterizacao_local,
+    v."CaracterizacaoDoLocal"                 AS caracterizacao_local_lista,
     (fn_bi_normaliza(v."GrauRiscoEncontrado") IN ('ALTO', 'MUITO ALTO', 'MUITO_ALTO')) AS risco_alto,
     (fn_bi_normaliza(v."Interdicao") IN ('TOTAL', 'PARCIAL'))                          AS houve_interdicao,
 
@@ -429,6 +433,10 @@ FROM (
         SELECT 'Motivação',                        unnest(v."Motivacao")
         UNION ALL
         SELECT 'Área afetada',                     unnest(v."AreasAfetadas")
+        UNION ALL
+        SELECT 'Regime de ocupação',               unnest(v."RegimeOcupacao")
+        UNION ALL
+        SELECT 'Caracterização do local',          unnest(v."CaracterizacaoDoLocal")
         UNION ALL
         SELECT 'Orientação',                       unnest(v."Orientacoes")
         UNION ALL

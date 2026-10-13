@@ -47,6 +47,11 @@ namespace SIG_Defesa_Civil.API.Services.Relatorio
                 .Include(o => o.AvaliacaoRisco)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador1)
                 .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador2)
+                // O modelo de 2026 tem três linhas de vistoriador e um campo
+                // "AGENTE(S)" com a equipe inteira: sem estes dois, os nomes
+                // viriam vazios sem nenhum erro aparecer.
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador3)
+                .Include(o => o.Agendamentos).ThenInclude(a => a.Vistoriador4)
                 .Include(o => o.Vistorias)
                 .Include(o => o.Notificados)
                 .Include(o => o.EncaminhamentoFinal)
@@ -105,6 +110,27 @@ namespace SIG_Defesa_Civil.API.Services.Relatorio
                 ["<<MATRICULA_VISTORIADOR_1>>"]     = agendamento?.Vistoriador1?.Matricula ?? string.Empty,
                 ["<<MATRICULA_VISTORIADOR_2>>"]     = agendamento?.Vistoriador2?.Matricula ?? string.Empty,
                 ["<<ENCAMINHAMENTOS>>"]             = encaminhamentosStr,
+
+                // ── Modelo oficial de 2026 ───────────────────────────────────
+                // O cabeçalho do formulário já imprime "PROTOCOLO Nº 2026", então
+                // aqui vai só a parte sequencial, sem repetir o ano.
+                ["<<PROTOCOLO_SEQ>>"] = ocorrencia.Protocolo.Contains('-')
+                    ? ocorrencia.Protocolo.Split('-')[1]
+                    : ocorrencia.Protocolo,
+
+                // "AGENTE(S)" do formulário é a equipe que foi a campo, toda ela.
+                ["<<AGENTES>>"] = agendamento == null ? string.Empty : string.Join(", ",
+                    new[]
+                    {
+                        agendamento.Vistoriador1?.Nome,
+                        agendamento.Vistoriador2?.Nome,
+                        agendamento.Vistoriador3?.Nome,
+                        agendamento.Vistoriador4?.Nome,
+                    }.Where(n => !string.IsNullOrWhiteSpace(n))),
+
+                ["<<GRAU_RISCO_ENCONTRADO>>"]       = vistoria.GrauRiscoEncontrado ?? string.Empty,
+                ["<<NOME_VISTORIADOR_3>>"]          = agendamento?.Vistoriador3?.Nome      ?? string.Empty,
+                ["<<MATRICULA_VISTORIADOR_3>>"]     = agendamento?.Vistoriador3?.Matricula ?? string.Empty,
             };
 
             // Notificados dinâmicos — suporta até 5 entradas com tags <<NOME_NOTIFICADO_N>>

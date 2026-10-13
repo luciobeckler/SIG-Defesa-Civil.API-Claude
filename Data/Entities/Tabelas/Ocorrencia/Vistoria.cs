@@ -1,4 +1,4 @@
-using SIG_Defesa_Civil.API.Data.Models.Tabelas;
+﻿using SIG_Defesa_Civil.API.Data.Models.Tabelas;
 using SIG_Defesa_Civil.API.Enums;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -36,8 +36,12 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         // personalizadas do catálogo (além dos valores fixos dos enums).
         public string? DescricaoDoLocal { get; set; }
 
-        /// <summary>Geomorfologia do terreno. Valor do enum CaracterizacaoLocal ou opção personalizada.</summary>
-        public string? CaracterizacaoDoLocal { get; set; }
+        /// <summary>
+        /// Geomorfologia do terreno — <b>multivalorada</b>: um mesmo lote costuma ser
+        /// encosta e margem de córrego ao mesmo tempo. Texto, não enum, para aceitar
+        /// as opções do catálogo (<c>CamposVistoria.CaracterizacaoLocal</c>).
+        /// </summary>
+        public List<string> CaracterizacaoDoLocal { get; set; } = new();
 
         public string Edificacao { get; set; } = string.Empty;
         public string Estrutura { get; set; } = string.Empty;
@@ -68,7 +72,11 @@ namespace SIG_Defesa_Civil.API.Data.Entities.Tabelas.Ocorrencia
         /// <summary>Multi-select: tipificações identificadas na vistoria (text[]).</summary>
         public List<string> TipificacaoOcorrencia { get; set; } = new();
 
-        public string RegimeOcupacao { get; set; } = string.Empty;
+        /// <summary>
+        /// Multivalorado: parte do imóvel pode ser própria e parte alugada,
+        /// ou cedida e ocupada ao mesmo tempo.
+        /// </summary>
+        public List<string> RegimeOcupacao { get; set; } = new();
 
         // ── Conclusões ───────────────────────────────────────────────────────────
         /// <summary>Causas identificadas — multi-select (text[]).</summary>

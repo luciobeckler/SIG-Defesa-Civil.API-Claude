@@ -13,6 +13,13 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
     /// </summary>
     public interface IOcorrenciaService
     {
+        /// <summary>
+        /// Consulta com os mesmos filtros da listagem, sem paginar. Usada pela
+        /// exportação para a planilha refletir exatamente o que está na tela.
+        /// </summary>
+        IQueryable<Data.Entities.Tabelas.Ocorrencia.Ocorrencia> ConsultaFiltrada(
+            FiltroOcorrenciaDto filtros);
+
         // ── Etapa 1: Abertura ─────────────────────────────────────────────────────
 
         /// <summary>

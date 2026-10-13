@@ -18,7 +18,7 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
 
         // Caracterização (campos de seleção = texto: enums + opções personalizadas)
         public string? DescricaoDoLocal { get; set; }
-        public string? CaracterizacaoDoLocal { get; set; }
+        public List<string> CaracterizacaoDoLocal { get; set; } = new();
         public string Edificacao { get; set; } = string.Empty;
         public string Estrutura { get; set; } = string.Empty;
 
@@ -40,7 +40,7 @@ namespace SIG_Defesa_Civil.API.Data.DTO.Responses.Ocorrencias
         public string TipoRisco { get; set; } = string.Empty;
         public string GrauRiscoEncontrado { get; set; } = string.Empty;
         public List<string> TipificacaoOcorrencia { get; set; } = new();
-        public string RegimeOcupacao { get; set; } = string.Empty;
+        public List<string> RegimeOcupacao { get; set; } = new();
 
         // Conclusões
         public List<string> Motivacao { get; set; } = new();

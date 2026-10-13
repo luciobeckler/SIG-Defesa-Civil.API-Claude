@@ -397,8 +397,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<DateTime>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CaracterizacaoDoLocal")
-                        .HasColumnType("text");
+                    b.Property<List<string>>("CaracterizacaoDoLocal")
+                        .IsRequired()
+                        .HasColumnType("text[]");
 
                     b.Property<DateOnly>("DataVistoria")
                         .HasColumnType("date");
@@ -476,9 +477,9 @@ namespace SIG_Defesa_Civil.API.Migrations
                     b.Property<bool>("PossuiUnidadeFamiliar")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("RegimeOcupacao")
+                    b.Property<List<string>>("RegimeOcupacao")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text[]");
 
                     b.Property<DateTime>("RegistradoEm")
                         .HasColumnType("timestamp with time zone");

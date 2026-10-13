@@ -963,6 +963,15 @@ namespace SIG_Defesa_Civil.API.Services.Ocorrencia
         // HELPERS PRIVADOS
         // ═══════════════════════════════════════════════════════════════════════════
 
+        /// <summary>
+        /// Consulta com os mesmos filtros da listagem, sem paginar nem projetar.
+        /// Existe para a exportação reaproveitar o recorte exato da tela — se o
+        /// filtro mudar aqui, a planilha acompanha sozinha.
+        /// </summary>
+        public IQueryable<Data.Entities.Tabelas.Ocorrencia.Ocorrencia> ConsultaFiltrada(
+            FiltroOcorrenciaDto filtros) =>
+            AplicarFiltros(_context.Ocorrencias.Where(o => o.DeletedAt == null), filtros);
+
         private IQueryable<Data.Entities.Tabelas.Ocorrencia.Ocorrencia> AplicarFiltros(
             IQueryable<Data.Entities.Tabelas.Ocorrencia.Ocorrencia> query,
             FiltroOcorrenciaDto filtros)
